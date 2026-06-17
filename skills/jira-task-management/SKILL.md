@@ -18,13 +18,46 @@ Manage issues on Red Hat Jira (`redhat.atlassian.net`) via `jira-cli`. The tool 
 
 ## Before Creating Issues
 
-When the user asks to create a Task or Bug, two things are required before running the command:
+When the user asks to create a Task or Bug:
 
-1. **Epic link** — Every Task and Bug must be linked to an epic via `-P <EPIC-KEY>`. If the epic isn't obvious from the conversation (e.g., the user has been discussing a specific epic, or there's a CLAUDE.md reference), ask: *"Which epic should I link this to?"*
+1. **Epic link** — Link to an epic via `-P <EPIC-KEY>` only when the user specifies one or the epic is obvious from context. If unclear, **omit `-P`** and ask later rather than guessing.
 
 2. **Label** — Default to `-l OSAC`. Only use a different label if the user explicitly says so.
 
 Do not set priority — it's not relevant for this project.
+
+### Preventing duplicate creates (CRITICAL)
+
+A slow `jira issue create` can look hung while the API call is still in flight. **Never kill and retry** — that pattern created duplicate tickets (e.g. OSAC-1619 + OSAC-1620).
+
+**Before create** — search for an existing issue:
+
+```bash
+jira issue list -q 'summary ~ "exact or distinctive summary phrase"' --plain
+```
+
+**Safe create pattern** — use a template file, run create directly (not inside `$(...)`), allow up to 3 minutes:
+
+```bash
+# 1. Write body to a temp file (do not inline large heredocs in --body)
+jira issue create -tTask -s "Summary" \
+  --template /tmp/issue-body.md \
+  -l OSAC --no-input --raw > /tmp/jira-create.out
+
+# 2. Parse key from output file
+KEY=$(jq -r '.key' /tmp/jira-create.out)
+```
+
+**Never do this:**
+- `KEY=$(jira issue create ... --body "$(cat <<'EOF' ... EOF)" 2>/dev/null | jq -r '.key')` — no stdout until done; stderr hidden; looks hung for minutes
+- Kill a running create and immediately retry
+- Retry based only on a search that ran seconds earlier (Jira index lag)
+
+**If create appears slow or was interrupted:**
+1. **Do not retry yet** — wait for the original command to finish or confirm the process exited
+2. Re-search with a tight window: `jira issue list -q 'summary ~ "..." AND created >= -1h' --plain`
+3. If a match exists, use that key — do not create again
+4. Only create when search confirms zero matches
 
 ## Command Reference
 
@@ -194,5 +227,6 @@ jira open           # Open project page
 - **Auth errors / HTML in response:** Token may be expired. Regenerate at https://id.atlassian.com/manage-profile/security/api-tokens, update `~/.netrc`.
 - **"API v3" errors:** Config must use `installation: Cloud`. Re-run `jira init --installation cloud`.
 - **Interactive prompts hang:** Always pass `--no-input` for create/edit operations.
+- **Create looks hung / duplicates:** Large inline `--body` inside `$(...)` with `2>/dev/null` produces no output for minutes while the API works. Use `--template` and `--raw` to a file; wait up to 3 min; never kill-and-retry. See "Preventing duplicate creates" above.
 - **`--debug` flag:** Shows the actual REST API calls — useful for diagnosing unexpected behavior.
 - **Current user:** `jira me` returns the authenticated username.
