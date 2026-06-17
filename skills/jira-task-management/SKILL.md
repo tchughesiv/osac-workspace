@@ -121,9 +121,13 @@ jira issue list --jql '"Epic Link" = <EPIC-KEY> AND assignee is EMPTY' --plain
 ### Create
 
 ```bash
-# Task
+# Task (with epic when known)
 jira issue create -tTask -s "Summary" -b "Description" \
   -P <EPIC-KEY> -a <assignee> -l OSAC --no-input
+
+# Task (without epic — omit -P when epic is unclear; add later via jira issue edit -P)
+jira issue create -tTask -s "Summary" -b "Description" \
+  -l OSAC --no-input
 
 # Bug — use the structured description template
 jira issue create -tBug -s "Bug title" \
