@@ -179,6 +179,34 @@ Two-stage enhancement proposal flow. See the Enhancement Proposals section above
 - **e2e** — Write a pytest E2E test from a description or Jira ticket
 - **debug-e2e** — Debug a failing Prow CI job using build logs and gathered OSAC artifacts
 
+### Skill discovery
+
+Canonical skill definitions live in `skills/` (committed OSAC skills plus bootstrap-managed ai-workflows symlinks). Run `./bootstrap.sh` to wire skill discovery for each agent:
+
+| Agent | Skill path | Phase commands |
+|-------|------------|----------------|
+| Claude Code | `.claude/skills/` → `skills/` | `.claude/commands/` (ai-workflows) |
+| Cursor | `.cursor/skills/` → `skills/` | `.cursor/commands/` (ai-workflows) |
+| Gemini CLI | `.gemini/skills/` → `skills/` | — |
+| GitHub Copilot | `AGENTS.md` conventions only | — |
+
+`.claude/`, `.cursor/`, and `.gemini/` are gitignored except project settings; bootstrap recreates agent skill symlinks via `tools/link-agent-skills.sh`.
+
+**OSAC repo-local skills** (in `skills/`):
+
+- **create-pr** — Fork-based PR creation on component repos
+- **report-bug** — File a Jira bug without fixing
+- **quick-fix** — Unattended bug fix with Jira ticket and PR
+- **osac-feature** — Create OSAC Jira Features
+- **jira-task-management** — Manage Jira issues via jira-cli
+- **capture-tasks-from-meeting-notes** — Extract action items from meeting notes into Jira
+- **generate-status-report** — Generate project status reports from Jira
+- **ep-review** — Review enhancement proposals
+- **prd-review** — Review PRDs
+- **milestone-scope** — Milestone readiness assessment
+- **osac-demo-recording** — asciinema API demo recordings
+- **presentation** — Red Hat Marp slide decks
+
 ## Architecture
 
 ```text
