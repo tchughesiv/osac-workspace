@@ -187,6 +187,34 @@ Two complementary skills for E2E tests, available from the `osac-workspace/` roo
 
 The `/e2e` workflow writes tests in `osac-test-infra/tests/` following the conventions in `osac-test-infra/.claude/skills/e2e.md` (gRPC client patterns, K8s client patterns, wait helpers, pytest fixtures). The `/debug-e2e` skill reads Prow logs and OSAC gathered artifacts to diagnose failures.
 
+### Skill discovery
+
+Canonical skill definitions live in `skills/` (committed OSAC skills plus bootstrap-managed ai-workflows symlinks). Run `./bootstrap.sh` to wire skill discovery for each agent:
+
+| Agent | Skill path | Phase commands |
+|-------|------------|----------------|
+| Claude Code | `.claude/skills/` → `skills/` | `.claude/commands/` (ai-workflows) |
+| Cursor | `.cursor/skills/` → `skills/` | `.cursor/commands/` (ai-workflows) |
+| Gemini CLI | `.gemini/skills/` → `skills/` | — |
+| GitHub Copilot | `AGENTS.md` conventions only | — |
+
+`.claude/`, `.cursor/`, and `.gemini/` are gitignored except project settings; bootstrap recreates agent skill symlinks via `tools/link-agent-skills.sh`.
+
+**OSAC repo-local skills** (in `skills/`):
+
+- **create-pr** — Fork-based PR creation on component repos
+- **report-bug** — File a Jira bug without fixing
+- **quick-fix** — Unattended bug fix with Jira ticket and PR
+- **osac-feature** — Create OSAC Jira Features
+- **jira-task-management** — Manage Jira issues via jira-cli
+- **capture-tasks-from-meeting-notes** — Extract action items from meeting notes into Jira
+- **generate-status-report** — Generate project status reports from Jira
+- **ep-review** — Review enhancement proposals
+- **prd-review** — Review PRDs
+- **milestone-scope** — Milestone readiness assessment
+- **osac-demo-recording** — asciinema API demo recordings
+- **presentation** — Red Hat Marp slide decks
+
 ## Architecture
 
 ```text
