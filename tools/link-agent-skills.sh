@@ -59,11 +59,13 @@ link_agent_skills() {
 }
 
 resolve_ai_workflows_dir() {
-  if [[ -d "${HOME}/.ai-workflows" ]]; then
-    readlink -f "${HOME}/.ai-workflows"
-  elif [[ -d "${PROJECT_ROOT}/.ai-workflows" ]]; then
-    readlink -f "${PROJECT_ROOT}/.ai-workflows"
-  fi
+  local dir
+  for dir in "${HOME}/.ai-workflows" "${PROJECT_ROOT}/.ai-workflows"; do
+    if [[ -d "${dir}" ]]; then
+      (cd "${dir}" && pwd -P)
+      return
+    fi
+  done
 }
 
 link_canonical_ai_workflows() {
