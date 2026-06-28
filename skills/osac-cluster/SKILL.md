@@ -1,6 +1,7 @@
 ---
 name: osac-cluster
-description: Use when the user needs an OSAC development cluster, wants to test locally, says "spawn a cluster", "boot a cluster", "I need a dev environment", asks about cluster-tool, or wants to run E2E tests on a real cluster. Also use when connecting to baremetal servers, pulling flavors, running refresh, or troubleshooting cluster issues.
+description: Boot, manage, or troubleshoot OSAC development clusters using cluster-tool.
+when_to_use: Use when the user needs an OSAC development cluster, wants to test locally, says "spawn a cluster", "boot a cluster", "I need a dev environment", asks about cluster-tool, or wants to run E2E tests on a real cluster. Also use when connecting to baremetal servers, pulling flavors, running refresh, or troubleshooting cluster issues.
 ---
 
 # OSAC Cluster — From Zero to Running Cluster
@@ -252,7 +253,7 @@ The snapshot contains a frozen version of OSAC. To apply the latest component im
 
 ### Prerequisites
 
-You need the osac-installer repo cloned and up to date: #claude u also need submodules up to date, and license and quay pull secret files where they are needed (check where it is!)
+You need the osac-installer repo cloned, submodules initialized, and up to date:
 
 ```bash
 git clone https://github.com/osac-project/osac-installer.git
@@ -261,9 +262,22 @@ git submodule update --init --recursive
 git fetch origin main && git rebase origin/main
 ```
 
-The refresh script also needs these tools on your laptop: `python3`, `oc`, `helm`, `curl`, `jq`, and the `osac` CLI.
+The refresh script also requires:
+- **Tools on your laptop:** `python3`, `oc`, `helm`, `curl`, `jq`, and the `osac` CLI
+- **AAP license file** at `values/<env>/license.zip` (e.g., `values/vmaas-ci/license.zip`)
+- **Quay pull secret** at `values/<env>/pull-secret.json` (optional — only needed if your cluster pulls from authenticated registries)
 
-### Refresh for VMaaS #claude make the skill check the release repo boot script to verify no changes were made in the parameters of the refresh script!
+### Verify refresh parameters are current
+
+Before running refresh, check the CI boot script to confirm the env vars below haven't changed:
+
+```bash
+curl -s https://raw.githubusercontent.com/openshift/release/master/ci-operator/step-registry/osac-project/cluster-tool/boot/osac-project-cluster-tool-boot-commands.sh | grep -A5 refresh-after-snapshot
+```
+
+Verify `VALUES_FILE`, `INSTALLER_NAMESPACE`, `INSTALLER_VM_TEMPLATE`, and `INSTALLER_CLUSTER_TEMPLATE` match what's documented below.
+
+### Refresh for VMaaS
 
 ```bash
 export KUBECONFIG=~/.kube/<name>.kubeconfig
@@ -276,7 +290,7 @@ env \
     python3 ./scripts/refresh-after-snapshot.py
 ```
 
-### Refresh for CaaS #claude make the skill check the release repo boot script to verify no changes were made in the parameters of the refresh script!
+### Refresh for CaaS
 
 ```bash
 export KUBECONFIG=~/.kube/<name>.kubeconfig
@@ -290,14 +304,13 @@ env \
 ```
 
 ### What refresh does (4 phases, ~10-20 minutes)
-#claude remove parallel/sequential nobody cares
 
-| Phase | What | Parallel? |
-|-------|------|-----------|
-| 1. Fix identity | Patch stale routes, refresh certificates, configure MetalLB subnet | Yes |
-| 2. Prepare | Sync Keycloak realm, create secrets, deploy fulfillment-db | Yes |
-| 3. Deploy | `helm upgrade osac` with latest images, wait for rollouts, configure AAP | Sequential |
-| 4. Post-flight | Create AAP token, create hub, publish templates, create tenants | Sequential |
+| Phase | What |
+|-------|------|
+| 1. Fix identity | Patch stale routes, refresh certificates, configure MetalLB subnet |
+| 2. Prepare | Sync Keycloak realm, create secrets, deploy fulfillment-db |
+| 3. Deploy | `helm upgrade osac` with latest images, wait for rollouts, configure AAP |
+| 4. Post-flight | Create AAP token, create hub, publish templates, create tenants |
 
 ### Environment variables reference
 
@@ -305,8 +318,8 @@ env \
 |----------|----------|---------|---------|
 | `VALUES_FILE` | Yes | — | Helm values file path (relative to repo root) |
 | `INSTALLER_NAMESPACE` | No | `osac-e2e-ci` | Kubernetes namespace where OSAC is deployed |
-| `INSTALLER_VM_TEMPLATE` | No | `""` | VMaaS: template name to wait for after publish | #IS required for vmaas
-| `INSTALLER_CLUSTER_TEMPLATE` | No | `""` | CaaS: cluster template name to wait for after publish | #IS required for caas
+| `INSTALLER_VM_TEMPLATE` | VMaaS | `""` | Template name to wait for after publish |
+| `INSTALLER_CLUSTER_TEMPLATE` | CaaS | `""` | Cluster template name to wait for after publish |
 | `KUBECONFIG` | Yes | — | Path to the cluster's kubeconfig (set in your shell) |
 
 ### Testing PR changes with refresh
@@ -565,7 +578,7 @@ git submodule update --init --recursive
 
 ### Clone name too long
 
-Clone names must be 8 characters or fewer. Linux bridge names are `br-{name[:8]}` — longer names cause silent collisions that crash boot. #then let them know upfront to use names with different prefixes to avoid collisions
+Clone names must be 8 characters or fewer. Linux bridge names are `br-{name[:8]}` — longer names cause silent collisions that crash boot. When running multiple clusters, use names with different prefixes (e.g., `rdu-t1` and `del-t1`, not `test-01` and `test-02`).
 
 ### Subnet exhaustion
 
