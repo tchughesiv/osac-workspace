@@ -91,8 +91,8 @@ ssh root@server.example.com
 git clone https://github.com/omer-vishlitzky/cluster-tool.git
 cd cluster-tool
 ./cluster-tool connect local --host local --data-path /home/cluster-tool
-./cluster-tool pull quay.io/rh-ee-ovishlit/cluster-flavors:vmaas-helm
-./cluster-tool boot --flavor vmaas-helm --name dev
+./cluster-tool pull quay.io/rh-ee-ovishlit/cluster-flavors:vmaas
+./cluster-tool boot --flavor vmaas --name dev --pull-secret /path/to/pull-secret.json
 export KUBECONFIG=~/.kube/dev.kubeconfig
 ```
 
@@ -171,8 +171,8 @@ A flavor is a reusable snapshot — golden disk images with OpenShift + OSAC com
 
 | OSAC deployment type | Flavor | OCI image |
 |---------------------|--------|-----------|
-| **VMaaS** (compute instances, VMs) | `vmaas-helm` | `quay.io/rh-ee-ovishlit/cluster-flavors:vmaas-helm` |
-| **CaaS** (hosted clusters) | `caas-helm` | `quay.io/rh-ee-ovishlit/cluster-flavors:caas-helm` |
+| **VMaaS** (compute instances, VMs) | `vmaas` | `quay.io/rh-ee-ovishlit/cluster-flavors:vmaas` |
+| **CaaS** (hosted clusters) | `caas` | `quay.io/rh-ee-ovishlit/cluster-flavors:caas` |
 
 **VMaaS** includes: OpenShift SNO + LVMS + CNV + cert-manager + Keycloak + AAP + OSAC (VM provisioning).
 
@@ -181,7 +181,7 @@ A flavor is a reusable snapshot — golden disk images with OpenShift + OSAC com
 ### Pull the flavor
 
 ```bash
-cluster-tool pull quay.io/rh-ee-ovishlit/cluster-flavors:vmaas-helm --server <alias>
+cluster-tool pull quay.io/rh-ee-ovishlit/cluster-flavors:vmaas --server <alias>
 ```
 
 This downloads ~60-90 GB from Quay.io. Takes ~10-15 minutes depending on network speed. You only need to do this once per server per flavor — the flavor is stored locally on the server.
@@ -198,17 +198,18 @@ cluster-tool flavors --server <alias>     # On specific server
 ## Step 4: Boot a cluster
 
 ```bash
-cluster-tool boot --flavor vmaas-helm --name <name> --server <alias>
+cluster-tool boot --flavor vmaas --name <name> --pull-secret <path-to-pull-secret.json> --server <alias>
 ```
 
 - **`--flavor`** — which snapshot to boot from (must be pulled first)
 - **`--name`** — short identifier, **max 8 characters** (e.g., `dev`, `test1`, `pr-42`). Linux bridge names are `br-{name[:8]}`, so longer names cause collisions.
+- **`--pull-secret`** — **(mandatory)** path to a pull secret JSON file for authenticated registry access. See [Obtaining a Pull Secret and AAP License](#obtaining-a-pull-secret-and-aap-license) below.
 - **`--server`** — which server to boot on (omit to use default)
 
 **Example:**
 
 ```bash
-cluster-tool boot --flavor vmaas-helm --name dev --server myserver
+cluster-tool boot --flavor vmaas --name dev --pull-secret values/vmaas-ci/pull-secret.json --server myserver
 ```
 
 Takes ~10 minutes. What happens:
@@ -238,10 +239,35 @@ If any step fails, all resources are rolled back automatically. No orphaned VMs 
 Multiple boot/destroy commands can run in parallel safely — cluster-tool uses file locking internally.
 
 ```bash
-cluster-tool boot --flavor vmaas-helm --name test1 --server myserver &
-cluster-tool boot --flavor vmaas-helm --name test2 --server myserver &
+cluster-tool boot --flavor vmaas --name test1 --pull-secret values/vmaas-ci/pull-secret.json --server myserver &
+cluster-tool boot --flavor vmaas --name test2 --pull-secret values/vmaas-ci/pull-secret.json --server myserver &
 wait
 ```
+
+---
+
+## Obtaining a Pull Secret and AAP License
+
+Both the `boot` command and the refresh script require a **pull secret** and an **AAP license**. Place these files in the osac-installer repo under the values directory for your deployment type:
+
+| Deployment type | Pull secret path | AAP license path |
+|----------------|-----------------|-----------------|
+| VMaaS | `values/vmaas-ci/pull-secret.json` | `values/vmaas-ci/license.zip` |
+| CaaS | `values/caas-ci/pull-secret.json` | `values/caas-ci/license.zip` |
+
+### Pull secret
+
+A pull secret provides credentials for authenticated container registries (Quay.io, registry.redhat.io). Obtain one from the [Red Hat Hybrid Cloud Console](https://console.redhat.com/openshift/install/pull-secret).
+
+Download the JSON file and place it at the path above (e.g., `values/vmaas-ci/pull-secret.json`).
+
+### AAP license
+
+The AAP bootstrap job requires a subscription manifest (`license.zip`). Obtain it from the [Red Hat Customer Portal](https://access.redhat.com/) under **Subscriptions > Subscription Allocations > Export Manifest**.
+
+Place `license.zip` at the path above (e.g., `values/vmaas-ci/license.zip`).
+
+For full details, see [Section 2.4 of the Helm Deployment Guide](https://github.com/osac-project/osac-installer/blob/main/docs/helm-deployment-guide.md#24-aap-license).
 
 ---
 
@@ -265,7 +291,9 @@ git fetch origin main && git rebase origin/main
 The refresh script also requires:
 - **Tools on your laptop:** `python3`, `oc`, `helm`, `curl`, `jq`, and the `osac` CLI
 - **AAP license file** at `values/<env>/license.zip` (e.g., `values/vmaas-ci/license.zip`)
-- **Quay pull secret** at `values/<env>/pull-secret.json` (optional — only needed if your cluster pulls from authenticated registries)
+- **Quay pull secret** at `values/<env>/pull-secret.json` (e.g., `values/vmaas-ci/pull-secret.json`)
+
+See [Obtaining a Pull Secret and AAP License](#obtaining-a-pull-secret-and-aap-license) for how to get these files.
 
 ### Verify refresh parameters are current
 
@@ -425,7 +453,7 @@ export KUBECONFIG=~/.kube/<name>.kubeconfig
 export OSAC_VM_KUBECONFIG=$KUBECONFIG
 export OSAC_NAMESPACE=osac-e2e-ci
 export OSAC_CLI_PATH=<path-to-osac-binary>
-export OSAC_PULL_SECRET_PATH=<path-to-osac-installer>/overlays/caas-ci/files/quay-pull-secret.json
+export OSAC_PULL_SECRET_PATH=<path-to-osac-installer>/values/caas-ci/pull-secret.json
 export OSAC_SSH_PUBLIC_KEY_PATH=~/.config/cluster-tool/cluster-tool.key.pub
 export OSAC_CLUSTER_TEMPLATE=osac.templates.ocp_ci_small
 
@@ -481,10 +509,10 @@ sudo cluster-tool setup client
 cluster-tool connect myserver --host root@server.example.com --data-path /home/cluster-tool
 
 # 4. Pull flavor (~10-15 min)
-cluster-tool pull quay.io/rh-ee-ovishlit/cluster-flavors:vmaas-helm --server myserver
+cluster-tool pull quay.io/rh-ee-ovishlit/cluster-flavors:vmaas --server myserver
 
 # 5. Boot (~5 min)
-cluster-tool boot --flavor vmaas-helm --name dev --server myserver
+cluster-tool boot --flavor vmaas --name dev --pull-secret values/vmaas-ci/pull-secret.json --server myserver
 
 # 6. Use it
 export KUBECONFIG=~/.kube/dev.kubeconfig
@@ -494,20 +522,21 @@ oc get nodes
 ### Subsequent boots (flavor already pulled)
 
 ```bash
-cluster-tool boot --flavor vmaas-helm --name dev --server myserver
+cluster-tool boot --flavor vmaas --name dev --pull-secret values/vmaas-ci/pull-secret.json --server myserver
 export KUBECONFIG=~/.kube/dev.kubeconfig
 ```
 
 ### Full workflow with refresh
 
 ```bash
-cluster-tool boot --flavor vmaas-helm --name dev --server myserver
+cluster-tool boot --flavor vmaas --name dev --pull-secret values/vmaas-ci/pull-secret.json --server myserver
 export KUBECONFIG=~/.kube/dev.kubeconfig
 
 cd <path-to-osac-installer>
 git fetch origin main && git rebase origin/main
 
-env VALUES_FILE=values/vmaas-ci/values.yaml \
+env \
+    VALUES_FILE=values/vmaas-ci/values.yaml \
     INSTALLER_NAMESPACE=osac-e2e-ci \
     INSTALLER_VM_TEMPLATE=osac.templates.ocp_virt_vm \
     python3 ./scripts/refresh-after-snapshot.py
@@ -523,7 +552,7 @@ env VALUES_FILE=values/vmaas-ci/values.yaml \
 | `use <alias>` | Set default server |
 | `pull <image> [--server <s>] [--name <n>]` | Pull a flavor from OCI registry |
 | `flavors [--server <s>] [--delete <n>]` | List or delete flavors |
-| `boot --flavor <f> --name <n> [--server <s>]` | Boot a cluster from a snapshot (~5 min) |
+| `boot --flavor <f> --name <n> --pull-secret <p> [--server <s>]` | Boot a cluster from a snapshot (~5 min) |
 | `list [--server <s>]` | List running clusters |
 | `verify <name> [--server <s>]` | Health-check a running cluster |
 | `destroy <name>\|--all [--server <s>]` | Tear down cluster(s) |
@@ -537,7 +566,7 @@ env VALUES_FILE=values/vmaas-ci/values.yaml \
 Boot does NOT auto-pull. You must pull the flavor first:
 
 ```bash
-cluster-tool pull quay.io/rh-ee-ovishlit/cluster-flavors:<flavor> --server <alias>
+cluster-tool pull quay.io/rh-ee-ovishlit/cluster-flavors:<flavor-name> --server <alias>
 ```
 
 ### DNS not resolving (can't reach API or console)
