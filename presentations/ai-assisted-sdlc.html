@@ -58,21 +58,22 @@
 <p>After bootstrap, every skill (<code>/prd</code>, <code>/design</code>, <code>/implement</code>, <code>/e2e</code>) is available and the codebase is up to date.</p>
 </section>
 </foreignObject></svg><svg data-marpit-svg="" viewBox="0 0 1280 720"><foreignObject width="1280" height="720"><section id="6" data-paginate="true" data-theme="redhat" lang="en-US" data-marpit-pagination="6" style="--paginate:true;--theme:redhat;" data-marpit-pagination-total="30">
-<h2 id="agentsmd--claudemd">AGENTS.md &amp; CLAUDE.md</h2>
+<h2 id="the-osac-harness">The OSAC Harness</h2>
 <p><strong>AGENTS.md</strong> — the <strong>primary</strong> instruction file, tool-agnostic:</p>
 <ul>
 <li>Repo structure, build commands, test commands</li>
 <li>Architecture patterns and coding conventions</li>
-<li>Cross-repo workflow rules (fork-based, DCO sign-off)</li>
 <li>Works with any AI coding tool (Claude Code, Copilot, Codex, Gemini)</li>
 </ul>
-<p><strong>CLAUDE.md</strong> — references AGENTS.md and adds Claude-specific details:</p>
+<p><strong>CLAUDE.md</strong> — references AGENTS.md, adds Claude-specific hooks and shortcuts.</p>
+<p>Every OSAC repo gets an AGENTS.md. Migration in progress — some still use CLAUDE.md only.</p>
+<p><strong>Supporting files in osac-workspace:</strong></p>
 <ul>
-<li>Points to AGENTS.md for shared instructions</li>
-<li>Claude Code tool configuration and hooks</li>
-<li>Common bug fix locations and shortcuts</li>
+<li><code>AI-assisted-development-workflow.md</code> — the step-by-step SDLC guide</li>
+<li><code>.design/templates/</code> — PRD and EP templates used by <code>/prd:draft</code> and <code>/design:draft</code></li>
+<li><code>.design/context/</code> — feature dimensions and review patterns</li>
+<li><code>skills/</code> — project-specific skills (prd-review, osac-cluster, operate)</li>
 </ul>
-<p><strong>Goal:</strong> every OSAC repo has an AGENTS.md. CLAUDE.md references it and layers on Claude-specifics. Migration is in progress — some repos still use CLAUDE.md only.</p>
 </section>
 </foreignObject></svg><svg data-marpit-svg="" viewBox="0 0 1280 720"><foreignObject width="1280" height="720"><section id="7" data-paginate="true" data-class="divider" data-theme="redhat" lang="en-US" class="divider" data-marpit-pagination="7" style="--paginate:true;--class:divider;--theme:redhat;" data-marpit-pagination-total="30">
 <h1 id="the-jira-hierarchy">The Jira Hierarchy</h1>

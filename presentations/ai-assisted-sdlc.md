@@ -77,22 +77,24 @@ After bootstrap, every skill (`/prd`, `/design`, `/implement`, `/e2e`) is availa
 
 ---
 
-## AGENTS.md & CLAUDE.md
+## The OSAC Harness
 
 **AGENTS.md** — the **primary** instruction file, tool-agnostic:
 
 - Repo structure, build commands, test commands
 - Architecture patterns and coding conventions
-- Cross-repo workflow rules (fork-based, DCO sign-off)
 - Works with any AI coding tool (Claude Code, Copilot, Codex, Gemini)
 
-**CLAUDE.md** — references AGENTS.md and adds Claude-specific details:
+**CLAUDE.md** — references AGENTS.md, adds Claude-specific hooks and shortcuts.
 
-- Points to AGENTS.md for shared instructions
-- Claude Code tool configuration and hooks
-- Common bug fix locations and shortcuts
+Every OSAC repo gets an AGENTS.md. Migration in progress — some still use CLAUDE.md only.
 
-**Goal:** every OSAC repo has an AGENTS.md. CLAUDE.md references it and layers on Claude-specifics. Migration is in progress — some repos still use CLAUDE.md only.
+**Supporting files in osac-workspace:**
+
+- `AI-assisted-development-workflow.md` — the step-by-step SDLC guide
+- `.design/templates/` — PRD and EP templates used by `/prd:draft` and `/design:draft`
+- `.design/context/` — feature dimensions and review patterns
+- `skills/` — project-specific skills (prd-review, osac-cluster, operate)
 
 ---
 
