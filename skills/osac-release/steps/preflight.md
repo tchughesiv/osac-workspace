@@ -1,6 +1,6 @@
-# Pre-flight Steps (0 -- 0.8)
+# Pre-flight Steps (0a -- 0e)
 
-## Step 0: Pre-flight Checks
+## Step 0a: Pre-flight Checks
 
 **Gate checks -- stop if any fail:**
 
@@ -21,7 +21,7 @@
 `--only` and `--skip` are mutually exclusive -- error if both are supplied.
 Version overrides must match `v[0-9]+\.[0-9]+\.[0-9]+` (strict semver).
 
-## Step 0.5: Component Selection (AskUserQuestion)
+## Step 0b: Component Selection (AskUserQuestion)
 
 Use AskUserQuestion with **exactly** this structure. Do NOT improvise the
 format -- use the exact questions, headers, options, and descriptions below.
@@ -45,7 +45,8 @@ so the user sees three tabs: `☐ Components`, `☐ More`, `✔ Submit`.
 | `osac-ui` | `Tags osac-ui repo, publishes osac-ui chart` |
 | `osac (umbrella)` | `Publishes umbrella chart via workflow_dispatch with all component versions` |
 
-Both questions use: `question: "Which components should be included in this release?"`
+Question 1 uses: `question: "Which components should be included in this release?"`
+Question 2 uses: `question: "Include these additional components?"`
 
 If `--only` or `--skip` flags were parsed from the user's message, pre-filter
 the selection accordingly (omit deselected components from the options).
@@ -59,7 +60,7 @@ published. Only component charts will be tagged and published."
 Only discover/clone repos and fetch tags for the selected components in the
 following steps.
 
-## Step 0.6: Recent Release Check
+## Step 0c: Recent Release Check
 
 Check if any release activity happened in the last 24 hours for the **selected
 components only**. This uses the GitHub API directly -- no local repos needed.
@@ -101,7 +102,7 @@ informational notice and continue without blocking:
   🏷️  fulfillment-service → v0.0.69 (completed 3h ago)
 ```
 
-## Step 0.7: Release Coordination Gate (AskUserQuestion)
+## Step 0d: Release Coordination Gate (AskUserQuestion)
 
 Ask the user two things before proceeding:
 
@@ -124,9 +125,9 @@ acknowledgment. Then re-run `/osac-release`."
 
 Record the release reason -- include it in the Step 9 release summary.
 
-## Step 0.8: Repo Discovery
+## Step 0e: Repo Discovery
 
-Discover and validate repos **only for the selected components** from Step 0.5.
+Discover and validate repos **only for the selected components** from Step 0b.
 
 ```bash
 WORKSPACE_ROOT=$(git rev-parse --show-toplevel)
@@ -135,29 +136,35 @@ PARENT_DIR=$(dirname "$WORKSPACE_ROOT")
 for repo in <selected repos>; do
   path="${PARENT_DIR}/${repo}"
   if [ -d "$path" ]; then
-    upstream_url=$(git -C "$path" remote get-url upstream 2>/dev/null || true)
-    if [ -z "$upstream_url" ]; then
-      echo "ERROR: ${repo} has no upstream remote. Run:"
-      echo "  git -C $path remote add upstream git@github.com:osac-project/${repo}.git"
+    # Detect which remote points to osac-project (bootstrap.sh uses origin, manual setups use upstream)
+    OSAC_REMOTE=""
+    for remote in origin upstream; do
+      url=$(git -C "$path" remote get-url "$remote" 2>/dev/null || true)
+      if echo "$url" | grep -qE "osac-project/${repo}(\.git)?$"; then
+        OSAC_REMOTE="$remote"
+        break
+      fi
+    done
+    if [ -z "$OSAC_REMOTE" ]; then
+      echo "ERROR: ${repo} has no remote pointing to osac-project/${repo}."
+      echo "  Run: git -C $path remote add origin https://github.com/osac-project/${repo}.git"
       # Stop or prompt user
-    elif echo "$upstream_url" | grep -qE "osac-project/${repo}(\.git)?$"; then
-      # OK -- upstream points to the correct repo
-    else
-      echo "WARNING: ${repo} upstream remote points to ${upstream_url}, expected osac-project/${repo}"
     fi
   fi
 done
 ```
 
-If a selected repo is not found, clone it automatically via SSH without asking:
+Store `OSAC_REMOTE` per repo for use in all subsequent steps. All git commands
+that reference the osac-project remote (`git fetch`, `git push`, `git tag`,
+`git ls-remote`, `git rev-parse`) use `$OSAC_REMOTE` instead of a hardcoded
+remote name.
 
-```bash
-git clone git@github.com:osac-project/<repo>.git "${PARENT_DIR}/${repo}"
-git -C "${PARENT_DIR}/${repo}" remote rename origin upstream
-```
+If a selected repo is not found, tell the user:
 
-**Always use SSH** (`git@github.com:`) for cloning -- HTTPS clones cannot push
-tags. If the SSH clone fails, then ask the user (AskUserQuestion):
+> "Repo `<repo>` not found. Run `./bootstrap.sh` from `osac-workspace/` to set
+> up missing repos with correct remotes, then re-run `/osac-release`."
+
+If the user cannot run `bootstrap.sh`, offer (AskUserQuestion):
 - A) Provide an explicit path to an existing checkout
 - B) Skip this component (the umbrella chart will use the component's current
   published version)
@@ -172,5 +179,5 @@ if [ -n "$(git -C "$path" status --porcelain)" ]; then
 fi
 ```
 
-Warn the user but do not block. Tags are created on `upstream/main`, not the
-local working tree.
+Warn the user but do not block. Tags are created on `$OSAC_REMOTE/main`, not
+the local working tree.

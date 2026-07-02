@@ -2,15 +2,15 @@
 
 ## Step 1: Fetch Tags and Determine Current Versions
 
-Only fetch tags for the components selected in Step 0.5.
+Only fetch tags for the components selected in Step 0b.
 
-For each component repo, fetch upstream tags and find the latest release tag:
+For each component repo, fetch $OSAC_REMOTE tags and find the latest release tag:
 
 ```bash
 cd "$REPO_PATH"
-git fetch upstream --tags
-# List tags from upstream remote, filter to semver releases only
-git ls-remote upstream --tags 'v*' | sed 's|.*/||; s|\^{}||' | grep -v '^api/' | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -1
+git fetch $OSAC_REMOTE --tags
+# List tags from $OSAC_REMOTE remote, filter to semver releases only
+git ls-remote $OSAC_REMOTE --tags 'v*' | sed 's|.*/||; s|\^{}||' | grep -v '^api/' | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -1
 ```
 
 Tag selection: latest tag matching `v[0-9]+.[0-9]+.[0-9]+` (strict semver, no
@@ -72,7 +72,7 @@ Print the computed versions using a box-drawing ASCII table:
 
 Show the same table from Step 2 in the AskUserQuestion prompt, prefixed with
 the release reason and suffixed with "All tags will be created on
-upstream/main."
+$OSAC_REMOTE/main."
 
 Options:
 - A) Proceed with these versions
@@ -89,8 +89,8 @@ bare-metal-fulfillment-operator, osac-ui):
 
 1. Check if tag already exists and compare SHAs:
    ```bash
-   TAG_SHA=$(git ls-remote upstream --tags "v<VERSION>" | awk '{print $1}')
-   MAIN_SHA=$(git rev-parse upstream/main)
+   TAG_SHA=$(git ls-remote $OSAC_REMOTE --tags "v<VERSION>" | awk '{print $1}')
+   MAIN_SHA=$(git rev-parse $OSAC_REMOTE/main)
    ```
 2. If `TAG_SHA` is empty, tag does not exist -- proceed to step 5.
 3. If `TAG_SHA == MAIN_SHA`, skip tagging (already tagged on the correct
@@ -99,15 +99,15 @@ bare-metal-fulfillment-operator, osac-ui):
    - A) Delete and re-tag
    - B) Skip this component (umbrella uses old version -- warn user)
    - C) Abort entire release
-5. Tag `upstream/main`: `git tag v<VERSION> upstream/main`
-6. Push tag: `git push upstream v<VERSION>`
+5. Tag `$OSAC_REMOTE/main`: `git tag v<VERSION> $OSAC_REMOTE/main`
+6. Push tag: `git push $OSAC_REMOTE v<VERSION>`
 7. If push fails after previous repos succeeded, offer:
    - A) Rollback all tags pushed so far in this release (for each previously
-     tagged component: `git push upstream :refs/tags/v<THAT_COMPONENT_VERSION>`)
+     tagged component: `git push $OSAC_REMOTE :refs/tags/v<THAT_COMPONENT_VERSION>`)
    - B) Retry this repo
    - C) Abort and investigate manually
 
-**Important:** Always tag `upstream/main`, never a local branch.
+**Important:** Always tag `$OSAC_REMOTE/main`, never a local branch.
 
 ## Step 5: Monitor Publish Workflows
 

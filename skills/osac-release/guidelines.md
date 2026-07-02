@@ -18,6 +18,7 @@ Every step must have a header and use the icon vocabulary below.
 | `⏳` | Waiting / retrying |
 | `⚠️`  | Warning (non-blocking) |
 | `🚀` | Release summary / final result |
+| `📝` | GitHub Release link |
 
 ## Examples
 
@@ -37,7 +38,7 @@ Every step must have a header and use the icon vocabulary below.
 
 **[Step 1] Fetch Tags & Determine Current Versions**
 
-  **Fetching upstream tags...**
+  **Fetching tags...**
   🏷️  fulfillment-service             → v0.0.69 (git tag)
   🏷️  osac-operator                   → v0.0.2  (git tag)
   🏷️  osac-aap                        → v0.0.4  (git tag)
@@ -47,7 +48,7 @@ Every step must have a header and use the icon vocabulary below.
 
 **[Step 4] Tag & Push Components**
 
-  **Tagging upstream/main...**
+  **Tagging main...**
   🏷️  fulfillment-service             → v0.0.70 pushed
   🏷️  osac-operator                   → v0.0.3  pushed
   🏷️  osac-aap                        → v0.0.5  pushed
@@ -83,9 +84,9 @@ Every step must have a header and use the icon vocabulary below.
    transitions, no commentary. Just icons and results.
 
 2. **Suppress bash output.** Redirect stdout with `>/dev/null` on every bash
-   command. Keep stderr available (`2>&1` only on success paths) so failed
-   commands can be diagnosed. The user must NEVER see raw git, helm, or gh
-   output on success. On failure, show the captured stderr for debugging.
+   command. Let stderr flow naturally -- it reaches the Bash tool result for
+   diagnosis on failure and is ignored on success. The user must NEVER see
+   raw git, helm, or gh output on success.
 
 3. **Descriptive bash labels.** Always set the `description` parameter on
    every Bash tool call to a short, human-friendly label. The user sees

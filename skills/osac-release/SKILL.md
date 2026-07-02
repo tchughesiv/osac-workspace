@@ -2,7 +2,7 @@
 name: osac-release
 description: >
   Publish new OSAC Helm chart versions across all component repos and the
-  umbrella chart. Auto-increments patch versions by default, tags upstream/main,
+  umbrella chart. Auto-increments patch versions by default, tags origin/main,
   monitors CI workflows, verifies OCI registry publication, and publishes the
   osac-installer umbrella chart with the new component versions. USE WHEN user
   says "osac-release", "osac release", "publish osac", "bump osac versions",
@@ -87,7 +87,11 @@ Discovery steps:
 1. Determine workspace root: `git rev-parse --show-toplevel` from `osac-workspace/`
 2. For each component, check `$(dirname $WORKSPACE_ROOT)/<repo-name>/`
 3. If not found, prompt user via AskUserQuestion for the repo path
-4. Validate: `git remote get-url upstream` must match `osac-project/<repo-name>(.git)?$`
+4. Detect the osac-project remote: check both `origin` and `upstream` URLs to
+   find which remote points to `osac-project/<repo-name>(.git)?$`. Store this
+   as `OSAC_REMOTE` for each repo (`origin` for bootstrap.sh setups,
+   `upstream` for manual setups). All git commands in subsequent steps use
+   `$OSAC_REMOTE` instead of a hardcoded remote name.
 
 ## Workflow
 
@@ -95,7 +99,7 @@ Execute steps in order. Read the referenced file for each phase:
 
 | Phase | Steps | File |
 |-------|-------|------|
-| Pre-flight | 0, 0.5, 0.6, 0.7, 0.8 | `steps/preflight.md` |
+| Pre-flight | 0a, 0b, 0c, 0d, 0e | `steps/preflight.md` |
 | Tag & publish | 1, 2, 3, 4, 5, 6 | `steps/release.md` |
 | Umbrella & summary | 7, 8, 9 | `steps/umbrella.md` |
 
@@ -105,8 +109,8 @@ Execute steps in order. Read the referenced file for each phase:
 |-------|--------|
 | `gh` or `helm` not found | Error with install instructions |
 | Repo not found at expected path | Ask user for explicit path |
-| No `upstream` remote | Error: `git remote add upstream git@github.com:osac-project/<repo>.git` |
-| Uncommitted changes in repo | Warn (non-blocking) -- tags are on upstream/main |
+| No osac-project remote | Error: neither `origin` nor `upstream` points to `osac-project/<repo>` |
+| Uncommitted changes in repo | Warn (non-blocking) -- tags are on `$OSAC_REMOTE/main` |
 | Tag already exists on same commit | Skip tagging, proceed to monitoring |
 | Tag already exists on different commit | Ask: (a) delete and re-tag, (b) skip, (c) abort |
 | Tag push fails after previous repos tagged | Ask: (a) rollback previous tags, (b) retry, (c) abort |
@@ -123,7 +127,7 @@ Execute steps in order. Read the referenced file for each phase:
 - bare-metal-fulfillment-operator also publishes TWO charts (operator +
   operator-crds) from a single tag push. Same verification pattern.
 - osac-ui publishes ONE chart (`osac-ui`) from a single tag push.
-- Always tag `upstream/main` to ensure the latest merged code is tagged.
+- Always tag `$OSAC_REMOTE/main` to ensure the latest merged code is tagged.
 - The umbrella chart uses `workflow_dispatch` (not tag push) to allow explicit
   version control over component dependencies.
 - fulfillment-service also publishes container images and Go binaries via

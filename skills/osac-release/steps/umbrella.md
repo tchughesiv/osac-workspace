@@ -3,21 +3,25 @@
 ## Step 7: Publish Umbrella Chart
 
 The osac-installer `publish-charts.yaml` workflow accepts `workflow_dispatch`
-with explicit version inputs. Dispatch with the component versions just
-published:
+with explicit version inputs. **Strip the `v` prefix for ALL `-f` values** --
+the workflow expects bare semver (e.g., `0.0.3` not `v0.0.3`). Dispatch with
+the component versions just published:
 
 ```bash
 gh workflow run publish-charts.yaml \
   --repo osac-project/osac-installer \
-  -f version=<UMBRELLA_VERSION> \
-  -f operator_crds_version=<OPERATOR_VERSION> \
-  -f operator_version=<OPERATOR_VERSION> \
-  -f service_version=<SERVICE_VERSION> \
-  -f aap_version=<AAP_VERSION> \
-  -f bmf_crds_version=<BMF_VERSION> \
-  -f bmf_version=<BMF_VERSION> \
-  -f ui_version=<UI_VERSION>
+  -f version=<UMBRELLA_VERSION_NO_V> \
+  -f operator_crds_version=<OPERATOR_VERSION_NO_V> \
+  -f operator_version=<OPERATOR_VERSION_NO_V> \
+  -f service_version=<SERVICE_VERSION_NO_V> \
+  -f aap_version=<AAP_VERSION_NO_V> \
+  -f bmf_crds_version=<BMF_VERSION_NO_V> \
+  -f bmf_version=<BMF_VERSION_NO_V> \
+  -f ui_version=<UI_VERSION_NO_V>
 ```
+
+Where `<X_NO_V>` means the version without the `v` prefix (e.g., if the tag is
+`v0.0.3`, pass `0.0.3`).
 
 The umbrella version is determined from osac-installer's latest tag + patch
 bump. Using `workflow_dispatch` (not tag push) ensures the umbrella chart gets
@@ -28,7 +32,7 @@ Note: `operator_crds_version` uses the same version as `operator_version`
 (both charts are published from the same osac-operator tag). Same applies to
 `bmf_crds_version` and `bmf_version`.
 
-**Skipped components:** For any component deselected in Step 0.5, use its
+**Skipped components:** For any component deselected in Step 0b, use its
 current published version (from the Step 1 git tag / OCI lookup) instead of a
 newly computed version. The corresponding `-f` flag must still be included in
 the dispatch command with the existing version.
@@ -66,9 +70,9 @@ Confirm the dependencies list shows the correct component versions.
 
 ```bash
 cd "$OSAC_INSTALLER_PATH"
-git fetch upstream --tags
-git tag v<UMBRELLA_VERSION> upstream/main
-git push upstream v<UMBRELLA_VERSION>
+git fetch $OSAC_REMOTE --tags
+git tag v<UMBRELLA_VERSION> $OSAC_REMOTE/main
+git push $OSAC_REMOTE v<UMBRELLA_VERSION>
 ```
 
 This creates a version record since `workflow_dispatch` does not create a tag
@@ -79,7 +83,7 @@ automatically.
 Print a final summary using a box-drawing ASCII table:
 
 ```text
-Release Complete! (Reason: <release reason from Step 0.5>)
+Release Complete! (Reason: <release reason from Step 0b>)
 
 ┌────────────────────────────────────────┬─────────┬──────────────────────────────────────────────────────────────────────┐
 │ Chart                                  │ Version │ Registry                                                           │
@@ -96,6 +100,9 @@ Release Complete! (Reason: <release reason from Step 0.5>)
 
 To install:
   helm install osac oci://ghcr.io/osac-project/charts/osac --version <UMBRELLA_VERSION>
+
+GitHub Releases:
+  https://github.com/osac-project/osac-installer/releases/tag/v<UMBRELLA_VERSION>
 ```
 
 If any components were skipped, note which ones and what versions the umbrella
