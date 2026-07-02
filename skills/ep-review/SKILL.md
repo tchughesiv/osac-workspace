@@ -15,7 +15,10 @@ description: |
 
 ## Overview
 
-This skill reviews an enhancement proposal against the [OSAC EP template](https://github.com/osac-project/enhancement-proposals/blob/main/guidelines/enhancement_template.md), architectural conventions, and patterns learned from past reviewer feedback. It scores the EP across four dimensions and produces structured findings that help the author fix issues before human reviewers spend time on them.
+This skill reviews an enhancement proposal against the [OSAC EP template](https://github.com/osac-project/enhancement-proposals/blob/main/guidelines/enhancement_template.md),
+architectural conventions, and patterns learned from past reviewer feedback.
+It uses calibrated 0-2 scoring across 4 dimensions with hard pass/fail
+thresholds — matching the Org Pulse dashboard assessment format.
 
 ## When to Use
 
@@ -47,110 +50,141 @@ Before reviewing, read these files if they exist:
 1. `.design/context/osac-dimensions.md` — services, personas, cross-cutting dimensions
 2. `.design/context/review-patterns.md` — reviewer feedback themes, anti-patterns, EP reference library
 3. `.planning/codebase/ARCHITECTURE.md` — system architecture for technical grounding
-4. `osac-docs/personas.md` — canonical OSAC persona definitions (bootstrapped from `osac-project/docs`)
+4. `docs/personas.md` — canonical OSAC persona definitions
 
-Before scoring Completeness, read every `###` section under **Cross-Cutting Dimensions**
-in the loaded `osac-dimensions.md`. For each section **relevant** to this EP, the EP must
-**address** it in Proposal/Test Plan/Non-Goals or **explicitly defer** (e.g., "API/CLI-only",
-"documentation deferred to Graduation Criteria"). Flag **Important** if relevant but silent.
-Irrelevant sections → N/A (do not penalize).
+## Scoring Rubric
 
-## Review Dimensions
+### Context
 
-Evaluate the EP across four dimensions. Each dimension is scored 1-5:
+An enhancement proposal describes HOW a feature will be implemented — architecture,
+API design, controller logic, provisioning workflows. It builds on a PRD (WHAT/WHY)
+and provides enough detail for engineering to estimate, plan, and implement.
 
-| Score | Meaning |
-|-------|---------|
-| 5 | Excellent — exceeds expectations, no issues |
-| 4 | Good — minor suggestions only |
-| 3 | Adequate — meets minimum bar, some gaps to address |
-| 2 | Needs work — significant gaps that will cause review friction |
-| 1 | Insufficient — fundamental problems, not ready for review |
+### Template Completeness
 
-### Dimension 1: Architecture (weight: 30%)
+Before scoring, note any structural issues. These feed into dimension scores
+rather than blocking the review — the agent must always produce scores for
+all 4 dimensions.
+
+- YAML frontmatter: title, authors, creation-date, last-updated, tracking-link (full URL)
+- Required sections: Summary, Motivation (User Stories, Goals, Non-Goals), Proposal (Workflow Description, API Extensions, Implementation Details, Risks and Mitigations, Drawbacks), Alternatives, Test Plan
+- Placeholder-only sections ("TODO", "TBD" with no other content) count against the relevant dimension score
+- Sections that are genuinely N/A must explain why — silence is a gap
+
+### Criteria (0-2 each, /8 total)
+
+Score each criterion independently. For each, first state your reasoning,
+then assign the score. Missing or placeholder-only sections that are relevant
+to a criterion pull that criterion's score toward 0.
+
+#### 1. Architecture (0-2)
 
 Are the technical decisions sound and consistent with OSAC patterns?
 
 Check:
-- [ ] Resource hierarchy uses owner reference annotations (`osac.openshift.io/owner-reference`), not separate fields
+- [ ] Resource hierarchy uses owner reference annotations (`osac.openshift.io/owner-reference`)
 - [ ] Tenant isolation includes `osac.openshift.io/tenant` annotation on all new resources
-- [ ] API conventions followed: gRPC + REST gateway, proto naming (PascalCase messages, snake_case fields, SCREAMING_SNAKE_CASE enums)
-- [ ] Controller patterns follow: finalizer → status update → provisioning lifecycle
-- [ ] State enums use Pending/Ready/Failed pattern (not terminal "Rejected" states)
+- [ ] API conventions: gRPC + REST gateway, proto naming (PascalCase messages, snake_case fields)
+- [ ] Controller patterns: finalizer → status update → provisioning lifecycle
+- [ ] State enums use Pending/Ready/Failed pattern
 - [ ] Maps avoided in CRDs — prefer lists of named subobjects
-- [ ] Write-only fields (secrets/credentials) are redacted in GET responses
-- [ ] Dependencies between components are identified and ordering is clear
-- [ ] Integration with existing services (fulfillment-service, osac-operator, osac-aap) is described
-- [ ] Pluggable architectures preferred over hardcoded implementations (e.g., NetworkClass pattern)
-- [ ] Cross-repo impacts enumerated (which components need changes?)
+- [ ] Dependencies between components identified with ordering
+- [ ] Integration with existing services described
+- [ ] Pluggable architectures preferred over hardcoded implementations
+- [ ] Cross-repo impacts enumerated
 - [ ] Breaking changes called out with migration strategies
+- [ ] Terminology defined upfront and used consistently throughout
 
-**Scoring guide:**
-- 5: All OSAC patterns followed, dependencies clear, integration well-described
-- 3: Core patterns followed, some integration gaps, minor convention misses
-- 1: Fundamental architectural misalignment, missing tenant isolation, no dependency analysis
+- 0 = Fundamental architectural misalignment — missing tenant isolation, wrong patterns, no dependency analysis
+- 1 = Core patterns followed but gaps — some conventions missed, integration partially described, inconsistent terminology
+- 2 = All OSAC patterns followed, dependencies clear, integration well-described, terminology consistent
 
-### Dimension 2: Feasibility (weight: 25%)
+**Calibration examples:**
 
-Is the implementation realistic and proportional to the scope?
+- A=0: EP introduces new CRDs without tenant annotation, uses direct DB access instead of gRPC, doesn't mention which repos need changes.
+- A=1: EP follows controller patterns and has tenant isolation, but uses maps in CRDs and doesn't describe interaction with osac-aap for provisioning.
+- A=2: EP follows all conventions, describes the full resource hierarchy with owner references, enumerates cross-repo changes (fulfillment-service proto + osac-operator controller + osac-aap role), and defines terminology upfront.
+
+#### 2. Feasibility (0-2)
+
+Is the implementation realistic, specific, and proportional to the scope?
 
 Check:
 - [ ] Implementation details are specific — names data structures, specifies error codes, defines validation rules
 - [ ] Proto schemas included for new resources (at least key fields, types, constraints)
 - [ ] No hand-waving on hard parts ("handle edge cases appropriately", "implement as needed")
-- [ ] Effort is proportional to scope — a "small" EP shouldn't require changes in 5 repos
-- [ ] Workflow covers all lifecycle operations (create, get, list, update, delete), not just happy path
+- [ ] Effort is proportional to scope
+- [ ] Workflow covers all lifecycle operations (create, get, list, update, delete)
 - [ ] Error handling and failure modes described
-- [ ] Risks are specific technical risks with concrete mitigations, not generic statements
+- [ ] Risks are specific technical risks with concrete mitigations
 - [ ] Drawbacks section steel-mans the argument against the proposal
 
-**Scoring guide:**
-- 5: Deep technical detail, proto schemas present, risks with concrete mitigations
-- 3: Reasonable detail, some sections thin, risks somewhat generic
-- 1: Vague implementation, no proto schemas, risks are platitudes
+- 0 = Vague implementation — no proto schemas, hand-waving on hard parts, generic risks ("things might break")
+- 1 = Reasonable detail but gaps — some lifecycle operations missing, risks somewhat generic, thin error handling
+- 2 = Deep technical detail, proto schemas present, all lifecycle ops covered, risks with concrete mitigations
 
-### Dimension 3: Scope (weight: 20%)
+**Calibration examples:**
 
-Is the EP right-sized with clear boundaries?
+- F=0: "The controller will handle provisioning appropriately" with no detail on what provisioning means, no proto schema, and risks like "implementation might be complex."
+- F=1: EP includes proto schemas for the main resource and describes create/get/list, but update and delete flows are "TBD." Risks mention "race conditions" without specifying which ones or how to mitigate.
+- F=2: EP includes full proto schemas with field types and validation annotations, describes all CRUD lifecycle operations with error codes, identifies specific risks ("concurrent subnet allocation may cause CIDR overlap") with concrete mitigations ("use optimistic locking with resource version").
+
+#### 3. Scope (0-2)
+
+Is the EP right-sized with clear boundaries, covering relevant personas and dimensions?
 
 Check:
-- [ ] Summary is 3-5 sentences answering: what's added, why it's valuable, key capabilities
-- [ ] Goals are 3-7 bullet points describing user-visible outcomes, not implementation tasks
+- [ ] Summary is 3-5 sentences: what's added, why it's valuable, key capabilities
+- [ ] Goals are user-visible outcomes, not implementation tasks
 - [ ] Non-goals are specific about what's explicitly out of scope and why
-- [ ] No scope creep signals ("and related functionality", "all necessary changes", "full support for")
-- [ ] Target milestone declared (from `osac-dimensions.md` milestone scoping)
-- [ ] Alternatives section includes at least one real alternative with explanation of why it was rejected
-- [ ] Related EPs referenced in see-also frontmatter field
-- [ ] User stories cover all relevant OSAC personas (Cloud Provider Admin, Cloud Infrastructure Admin, Tenant Admin, Tenant User)
-- [ ] User stories follow the formula: "As a [role], I want to [action] so that I can [goal]"
-- [ ] User stories describe user goals, not implementation details
+- [ ] No scope creep signals ("and related functionality", "all necessary changes")
+- [ ] Alternatives section includes at least one real alternative with rationale for rejection
+- [ ] User stories cover all relevant OSAC personas
+- [ ] User stories follow: "As a [role], I want to [action] so that I can [goal]"
 
-**Scoring guide:**
-- 5: Clear boundaries, all personas covered, specific non-goals, real alternatives
-- 3: Boundaries mostly clear, some personas missing, non-goals could be more specific
-- 1: Scope unbounded, only one persona, vague non-goals, no alternatives
+Using `.design/context/osac-dimensions.md`, also check cross-cutting dimension
+coverage — for each dimension relevant to this EP, the EP must address it or
+explicitly defer. Silence on a relevant dimension is a gap.
 
-### Dimension 4: Completeness (weight: 25%)
+- 0 = Scope unbounded, only one persona, vague non-goals, no alternatives, relevant dimensions ignored
+- 1 = Boundaries mostly clear, some personas missing, non-goals could be more specific, some dimensions not mentioned
+- 2 = Clear boundaries, all relevant personas covered, specific non-goals, real alternatives, relevant dimensions addressed or deferred
 
-Are all template sections present and substantive?
+**Calibration examples:**
 
-Check against the [EP template](https://github.com/osac-project/enhancement-proposals/blob/main/guidelines/enhancement_template.md):
+- S=0: EP has no non-goals, covers only "Tenant User" persona, and says "Alternatives: none considered." Storage dimension is relevant but not mentioned.
+- S=1: EP covers Tenant Admin and Tenant User but not Cloud Provider Admin (who would manage the feature's backend config). Non-goals say "advanced features are out of scope" without specifying which. Networking dimension acknowledged but not addressed.
+- S=2: EP covers all relevant personas with user stories, non-goals explicitly exclude auto-scaling and multi-region ("deferred to v0.2, see OSAC-XXXX"), alternatives section compares two real approaches with trade-offs, and all relevant dimensions from osac-dimensions.md are addressed or explicitly deferred.
 
-- [ ] YAML frontmatter complete (title, authors, creation-date, last-updated, tracking-link, see-also)
-- [ ] Tracking link is a full URL (https://redhat.atlassian.net/browse/OSAC-XXXXX)
-- [ ] Date format is YYYY-MM-DD
-- [ ] All required sections present: Summary, Motivation (User Stories, Goals, Non-Goals), Proposal (Workflow Description, API Extensions, Implementation Details, Risks and Mitigations, Drawbacks), Alternatives, Test Plan, Graduation Criteria, Upgrade/Downgrade Strategy, Version Skew Strategy, Support Procedures, Infrastructure Needed
-- [ ] No sections removed — sections that don't apply explain why
-- [ ] No placeholder-only sections — every section has substantive content or explains N/A
-- [ ] Terminology defined upfront and used consistently throughout
-- [ ] Test plan describes strategy (unit, integration, e2e) even if details are TBD
-- [ ] **Cross-cutting dimensions:** For each relevant `###` section in the loaded `osac-dimensions.md` (including UI, Documentation, E2E Testing when present), EP addresses or explicitly defers — not silent
-- [ ] Length is in the 300-800 line range (under 200 suggests insufficient depth)
+#### 4. Testability (0-2)
 
-**Scoring guide:**
-- 5: All sections substantive, terminology consistent, dimensions addressed, 400+ lines
-- 3: All sections present, some thin, terminology mostly consistent
-- 1: Missing required sections, placeholder text, under 200 lines
+Does the EP describe a concrete test strategy that would catch regressions?
+
+Check:
+- [ ] Test plan describes strategy per level: unit, integration, e2e
+- [ ] Unit tests specify what's tested (validation logic, state transitions, error paths)
+- [ ] Integration tests describe test infrastructure (kind cluster, mocked backends, etc.)
+- [ ] E2E tests describe user-observable scenarios
+- [ ] Graduation criteria are concrete conditions, not vague milestones
+
+- 0 = No test plan, or placeholder ("tests will be added"). Graduation criteria absent or vague.
+- 1 = Test plan mentions unit/integration/e2e but lacks specifics — doesn't say what's tested or how. Graduation criteria present but generic.
+- 2 = Test plan specifies what's tested at each level with concrete scenarios. Graduation criteria are measurable conditions.
+
+**Calibration examples:**
+
+- T=0: "Unit and integration tests will be added" — no specifics on what's tested.
+- T=1: "Unit tests for proto validation, integration tests with kind cluster" — right categories but no specific scenarios. Graduation criteria: "feature is stable."
+- T=2: "Unit tests for CIDR validation and overlap detection; integration tests for subnet creation and attachment using kind cluster with mock network backend; e2e test for full tenant workflow: create VirtualNetwork → create Subnet → attach to ComputeInstance → verify connectivity." Graduation criteria: "All CRUD operations pass e2e, error paths tested, no regressions in existing networking tests."
+
+### Pass/Fail
+
+- **PASS**: Total >= 5/8 AND no zeros on any criterion
+- **FAIL**: Total < 5 OR any zero (automatic fail regardless of total)
+
+A single zero is an automatic fail because it signals a fundamental problem
+(e.g., no test plan, or architectural misalignment). The author must fix
+zero-scored criteria before resubmission.
 
 ## Output Format
 
@@ -161,22 +195,22 @@ Present findings as a structured review:
 
 ### Rubric Scores
 
-| Dimension | Score | Weight | Weighted |
-|-----------|-------|--------|----------|
-| Architecture | X/5 | 30% | X.X |
-| Feasibility | X/5 | 25% | X.X |
-| Scope | X/5 | 20% | X.X |
-| Completeness | X/5 | 25% | X.X |
-| **Overall** | | | **X.X/5** |
+| Criterion | Score | Notes |
+|-----------|-------|-------|
+| Architecture | X/2 | {pattern compliance, dependency clarity, terminology} |
+| Feasibility | X/2 | {implementation depth, proto schemas, risk quality} |
+| Scope | X/2 | {boundary clarity, persona coverage, dimension coverage} |
+| Testability | X/2 | {test strategy specificity, graduation criteria} |
+| **Total** | **X/8** | **PASS / FAIL** |
 
-### Verdict: {PASS / NEEDS WORK / SIGNIFICANT GAPS}
+### Verdict: {PASS / FAIL}
 
-{1-2 sentence assessment}
+{1-2 sentence assessment. If fail, name the zero-scored criteria first.}
 
 ### Findings
 
-#### Critical (must fix before merge)
-1. {finding with specific section reference and suggestion}
+#### Critical (must fix — zero-scored criteria)
+1. {finding with specific section reference, quote the problematic text, suggest improvement}
 
 #### Important (should fix)
 1. {finding with specific section reference and suggestion}
@@ -184,55 +218,32 @@ Present findings as a structured review:
 #### Suggestions (nice to have)
 1. {finding}
 
-### Dimension Details
+### Criterion Details
 
-#### Architecture
-{What's good, what needs improvement, specific pattern violations}
+{For each criterion, explain the score with specific quotes from the EP.
+Show what's good and what needs improvement.}
 
-#### Feasibility
-{Implementation depth assessment, missing details, risk quality}
+### Cross-cutting Dimensions (from osac-dimensions.md)
 
-#### Scope
-{Boundary clarity, persona coverage, alternatives quality}
-
-#### Completeness
-{Section coverage, dimension coverage, length assessment}
-
-#### Cross-cutting dimensions (from osac-dimensions.md)
-
-| Dimension | Relevant? | EP status |
+| Dimension | Relevant? | EP Status |
 |-----------|-----------|-----------|
-| {name} | Yes / No / N/A | Addressed / Deferred / Gap / N/A |
+| {name} | Yes / No | Addressed / Deferred / Gap |
 
 ### Comparison with Similar EPs
 {Reference 1-2 merged EPs from the EP reference library in review-patterns.md
 that cover similar scope. Note what this EP does well or could learn from them.}
-
-### Checklist Summary
-- [x] Template sections complete
-- [ ] All personas covered
-- [x] Proto schemas included
-...
 ```
-
-## Verdict Thresholds
-
-| Overall Score | Verdict |
-|---------------|---------|
-| 4.0+ | **PASS** — Ready for merge (pending human review) |
-| 3.0-3.9 | **NEEDS WORK** — Address Important findings before requesting review |
-| Below 3.0 | **SIGNIFICANT GAPS** — Address Critical findings, consider returning to `/design:draft` |
 
 ## Severity Classification
 
-- **Critical**: Missing required sections, fundamental architectural misalignment, breaking changes without migration path, security gaps, no tenant isolation on new resources
-- **Important**: Incomplete sections, terminology inconsistencies, missing personas, unclear workflow, vague non-goals, generic risks, thin implementation details; **relevant cross-cutting dimension from `osac-dimensions.md` neither addressed nor explicitly deferred**
-- **Suggestion**: Style improvements, additional user stories, deeper alternatives discussion, more specific test plan, documentation polish
+- **Critical**: Any zero-scored criterion. Also: missing tenant isolation on new resources, fundamental architectural misalignment, breaking changes without migration path, security gaps.
+- **Important**: Score of 1 on any criterion. Also: incomplete sections, missing personas, unclear workflow, vague non-goals, generic risks, thin implementation details, relevant dimension neither addressed nor deferred.
+- **Suggestion**: Style improvements, additional user stories, deeper alternatives discussion, more specific test plan, documentation polish.
 
 ## Notes
 
 - Score based on what's in the EP, not what you think should be there
-- Use `osac-dimensions.md` to decide **relevance** per section (e.g., skip Networking for a storage-only EP). When a section **is** relevant, require address-or-defer — silence is a gap, not N/A
+- Use `osac-dimensions.md` to decide relevance per dimension — skip Networking for a storage-only EP. When a dimension is relevant, require address-or-defer — silence is a gap
 - Reference merged EPs in `enhancement-proposals/enhancements/` for calibration on depth and style
 - Push for specificity: "handle errors" is not a mitigation; "retry with exponential backoff, circuit-break after 3 failures" is
 - The review process requires consensus from all stakeholders — flag sections that would likely trigger stakeholder questions
