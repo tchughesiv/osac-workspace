@@ -28,6 +28,20 @@ Collect from conversation context. Ask only if truly ambiguous:
 
 ## Create the Feature
 
+The User Stories section must include at least one story for each OSAC persona
+that the feature affects. Use these exact persona names:
+
+| Persona | Role |
+|---------|------|
+| **Cloud Provider Admin** | Super-user: tenant onboarding, quotas, global catalogs |
+| **Cloud Infrastructure Admin** | Core infra: network, firewall, compute, storage, control plane integration |
+| **Tenant Admin** | Org config: IDP, users, quotas, org-specific catalogs |
+| **Tenant User** | Self-service: provisions and manages cloud resources |
+
+For each persona, write outcome-focused stories ("As a X, I want Y so that Z").
+If a persona is not affected by the feature, include a line stating it is not
+affected (e.g., "Cloud Infrastructure Admin — not affected by this feature").
+
 ```bash
 KEY=$(jira issue create -t Feature --project OSAC \
   --summary "<concise feature title>" \
@@ -41,7 +55,22 @@ KEY=$(jira issue create -t Feature --project OSAC \
 
 ## User Stories
 
-<Use cases and scenarios from user perspective>
+### Cloud Provider Admin
+
+- As a Cloud Provider Admin, I want <outcome> so that <reason>
+
+### Cloud Infrastructure Admin
+
+- As a Cloud Infrastructure Admin, I want <outcome> so that <reason>
+- (or: not affected by this feature)
+
+### Tenant Admin
+
+- As a Tenant Admin, I want <outcome> so that <reason>
+
+### Tenant User
+
+- As a Tenant User, I want <outcome> so that <reason>
 
 ## Definition of Done
 
@@ -85,7 +114,7 @@ Features should include these sections (shown in the body template above):
 
 - **Feature Goal** — What the feature aims to accomplish
 - **Problem Statement** — The problem this feature solves
-- **User Stories** — Use cases and scenarios from user perspective
+- **User Stories** — Outcome-focused stories organized by persona (all four OSAC personas must be addressed — either with stories or an explicit "not affected" note)
 - **Definition of Done** — Checklist of completion criteria
 - **Out of Scope** — What is explicitly excluded from this feature
 
