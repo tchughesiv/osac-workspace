@@ -28,6 +28,11 @@ Collect from conversation context. Ask only if truly ambiguous:
 
 ## Create the Feature
 
+The User Stories section must include a subsection for each OSAC persona
+defined in [`docs/personas.md`](https://github.com/osac-project/docs/blob/main/personas.md).
+For each persona, either write an outcome-focused story ("As a X, I want Y
+so that Z") or explicitly mark the persona as not affected by this feature.
+
 ```bash
 KEY=$(jira issue create -t Feature --project OSAC \
   --summary "<concise feature title>" \
@@ -41,7 +46,25 @@ KEY=$(jira issue create -t Feature --project OSAC \
 
 ## User Stories
 
-<Use cases and scenarios from user perspective>
+### Cloud Provider Admin
+
+- As a Cloud Provider Admin, I want <outcome> so that <reason>
+- (or: not affected by this feature)
+
+### Cloud Infrastructure Admin
+
+- As a Cloud Infrastructure Admin, I want <outcome> so that <reason>
+- (or: not affected by this feature)
+
+### Tenant Admin
+
+- As a Tenant Admin, I want <outcome> so that <reason>
+- (or: not affected by this feature)
+
+### Tenant User
+
+- As a Tenant User, I want <outcome> so that <reason>
+- (or: not affected by this feature)
 
 ## Definition of Done
 
@@ -85,7 +108,7 @@ Features should include these sections (shown in the body template above):
 
 - **Feature Goal** — What the feature aims to accomplish
 - **Problem Statement** — The problem this feature solves
-- **User Stories** — Use cases and scenarios from user perspective
+- **User Stories** — Outcome-focused stories organized by persona (all four OSAC personas must be addressed — either with stories or an explicit "not affected" note)
 - **Definition of Done** — Checklist of completion criteria
 - **Out of Scope** — What is explicitly excluded from this feature
 
