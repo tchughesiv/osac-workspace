@@ -20,7 +20,10 @@
 
 ## User Stories
 
-{Group by persona or workflow.}
+{Group by persona or workflow. Ground each story in explicit use cases — name
+the concrete artifacts, workflows, or scenarios, not generic capabilities.
+"I want to store SSH keypairs and OIDC client secrets" is actionable;
+"I want to create and manage secrets" is too vague to review.}
 
 ### {Persona or workflow name}
 

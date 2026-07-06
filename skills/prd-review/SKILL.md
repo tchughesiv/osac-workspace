@@ -95,7 +95,9 @@ unclear WHAT.
 
 - W=0: "Implement CSI driver installation via AAP playbook on ClusterOrder Ready event" — describes a system action, not a user need. No persona mentioned.
 - W=1: "Storage should be available on CaaS clusters" — right direction but vague. Which clusters? What does "available" mean to the user? How would a tenant know? No personas identified.
+- W=1: "Tenant users can create and manage secrets" — right direction but generic. What secrets? SSH keypairs? OIDC client secrets? Cluster kubeconfigs? Cloud-init credentials? Without explicit use cases, reviewers can't evaluate whether the scope is right.
 - W=2: "When a CaaS cluster is provisioned and ready, tenants can create persistent volumes using StorageClasses without manual configuration. Tenants can see whether storage is ready on their cluster. Cloud Provider Admins can see storage readiness across all tenant clusters." — clear, observable, specific, personas identified.
+- W=2: "Tenant users can retrieve cluster kubeconfig and admin password via the secrets API. Tenant admins can store OIDC client secrets for IDP integration. Tenant users can store cloud-init credentials containing passwords for VM provisioning." — names the concrete artifacts and scenarios, not just the generic capability.
 
 #### 2. WHY — Business justification? (0-2)
 
@@ -246,7 +248,7 @@ offending text and show what a user-focused rewrite would look like.}
 ## Severity Classification
 
 - **Critical**: Any zero-scored criterion. Also: missing required sections, no personas identified, PRD reads like a design document.
-- **Important**: Score of 1 on any criterion. Also: vague non-goals, weak acceptance criteria, scope creep signals.
+- **Important**: Score of 1 on any criterion. Also: vague non-goals, weak acceptance criteria, scope creep signals, requirements stated as generic capabilities without explicit use cases.
 - **Suggestion**: Style improvements, additional non-goals, deeper risk analysis, more specific metrics.
 
 ## Notes
