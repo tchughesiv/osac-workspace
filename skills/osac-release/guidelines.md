@@ -64,6 +64,15 @@ Every step must have a header and use the icon vocabulary below.
   🔄 bare-metal-fulfillment-operator → ⏳ queued
   🔄 osac-ui                         → ⏳ queued
 
+**[Step 6b] Verify Container Images**
+
+  🔍 fulfillment-service             → v0.0.70 ✅
+  🔍 osac-operator                   → v0.0.3  ✅
+  🔍 osac-aap                        → v0.0.5  ✅
+  🔍 bare-metal-fulfillment-operator → v0.0.1  ✅
+  🔍 osac-ui                         → v0.0.2  ✅
+  ✅ All 5 component images verified in ghcr.io/osac-project.
+
 **[Step 9] Release Summary**
 
 🚀 **Release Complete!** (Reason: Routine release)

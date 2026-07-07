@@ -173,3 +173,64 @@ If a chart is not found, wait 60 seconds and retry (up to 2 retries). For
 osac-operator and bare-metal-fulfillment-operator: verify both charts exist. The
 CRDs chart may publish slower from the same workflow. If still missing after
 retries, ask user to investigate.
+
+## Step 6b: Verify Container Images
+
+Each component's tag push (Step 4) also triggers a separate image-build
+workflow (not `publish-charts.yaml`). Verify the container image for the
+just-published version actually landed in GHCR -- a missing image build
+trigger (e.g. a workflow that never wired up `tags: ['v*']`) will pass chart
+verification (Step 6) while silently leaving no image for the version, which
+only surfaces later as `ImagePullBackOff` in a running cluster.
+
+Image workflow per component:
+- fulfillment-service: `publish-image.yaml`
+- osac-operator: `build-image.yaml`
+- osac-aap: `execution-environment.yml`
+- bare-metal-fulfillment-operator: `build-image.yaml`
+- osac-ui: `publish-image.yaml`
+
+The umbrella (osac-installer) has no container image of its own -- skip it.
+
+For each selected component, check the image tag exists using the GitHub
+Packages API (no extra CLI tools required beyond `gh`):
+
+```bash
+gh api "/orgs/osac-project/packages/container/<repo>/versions" --paginate \
+  --jq "[.[] | select(.metadata.container.tags | index(\"<VERSION>\"))] | length"
+```
+
+A result of `0` means the tag is missing. Treat any error (e.g. 404, no
+package published yet) the same as `0`.
+
+If missing, wait 60 seconds and retry (up to 2 retries) -- the image workflow
+may still be running even though `publish-charts.yaml` already completed,
+since they run as independent workflows triggered by the same tag push. If
+still missing after retries:
+
+```text
+❌ osac-operator → v0.0.8 image not found in ghcr.io/osac-project/osac-operator
+
+  The chart published successfully but no matching container image exists.
+  Check the image workflow run:
+    gh run list --repo osac-project/osac-operator -w build-image.yaml --limit 5
+```
+
+Ask the user:
+- A) Investigate the image workflow manually, then re-run verification
+- B) Proceed anyway (chart is published; image gap must be fixed separately)
+- C) Abort the release
+
+Show results using a box-drawing ASCII table:
+
+```text
+┌─────────────────────────────────┬─────────┬────────┐
+│ Component                       │ Version │ Image  │
+├─────────────────────────────────┼─────────┼────────┤
+│ fulfillment-service             │ v0.0.75 │ ✅     │
+│ osac-operator                   │ v0.0.8  │ ✅     │
+│ osac-aap                        │ v0.0.9  │ ✅     │
+│ bare-metal-fulfillment-operator │ v0.0.8  │ ✅     │
+│ osac-ui                         │ v0.0.3  │ ✅     │
+└─────────────────────────────────┴─────────┴────────┘
+```

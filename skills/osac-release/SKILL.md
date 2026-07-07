@@ -57,16 +57,19 @@ Actions workflow triggered by `v*` tag pushes. Chart.yaml files in component
 repos use `version: 0.0.0` as a placeholder -- the real version is injected at
 publish time.
 
-| Component | Repo | Charts Published | Tag Pattern |
-|-----------|------|-----------------|-------------|
-| fulfillment-service | osac-project/fulfillment-service | `fulfillment-service` | `v0.0.X` |
-| osac-operator | osac-project/osac-operator | `osac-operator` + `osac-operator-crds` | `v0.0.X` |
-| osac-aap | osac-project/osac-aap | `osac-aap` | `v0.0.X` |
-| bare-metal-fulfillment-operator | osac-project/bare-metal-fulfillment-operator | `bare-metal-fulfillment-operator` + `bare-metal-fulfillment-operator-crds` | `v0.0.X` |
-| osac-ui | osac-project/osac-ui | `osac-ui` | `v0.0.X` |
-| osac (umbrella) | osac-project/osac-installer | `osac` | `v0.0.X` or workflow_dispatch |
+| Component | Repo | Charts Published | Image Workflow | Tag Pattern |
+|-----------|------|-----------------|-----------------|-------------|
+| fulfillment-service | osac-project/fulfillment-service | `fulfillment-service` | `publish-image.yaml` | `v0.0.X` |
+| osac-operator | osac-project/osac-operator | `osac-operator` + `osac-operator-crds` | `build-image.yaml` | `v0.0.X` |
+| osac-aap | osac-project/osac-aap | `osac-aap` | `execution-environment.yml` | `v0.0.X` |
+| bare-metal-fulfillment-operator | osac-project/bare-metal-fulfillment-operator | `bare-metal-fulfillment-operator` + `bare-metal-fulfillment-operator-crds` | `build-image.yaml` | `v0.0.X` |
+| osac-ui | osac-project/osac-ui | `osac-ui` | `publish-image.yaml` | `v0.0.X` |
+| osac (umbrella) | osac-project/osac-installer | `osac` | (no image) | `v0.0.X` or workflow_dispatch |
 
-All charts are published to `oci://ghcr.io/osac-project/charts`.
+All charts are published to `oci://ghcr.io/osac-project/charts`. Each
+component's tag push also triggers its own image workflow (listed above),
+independent of `publish-charts.yaml`, publishing to
+`ghcr.io/osac-project/<repo>`.
 
 ## Repo Discovery
 
@@ -100,7 +103,7 @@ Execute steps in order. Read the referenced file for each phase:
 | Phase | Steps | File |
 |-------|-------|------|
 | Pre-flight | 0a, 0b, 0c, 0d, 0e | `steps/preflight.md` |
-| Tag & publish | 1, 2, 3, 4, 5, 6 | `steps/release.md` |
+| Tag & publish | 1, 2, 3, 4, 5, 6, 6b | `steps/release.md` |
 | Umbrella & summary | 7, 8, 9 | `steps/umbrella.md` |
 
 ## Error Handling
@@ -116,6 +119,7 @@ Execute steps in order. Read the referenced file for each phase:
 | Tag push fails after previous repos tagged | Ask: (a) rollback previous tags, (b) retry, (c) abort |
 | Workflow fails | Show failed logs, offer: retry / skip / abort |
 | Chart not in registry after workflow success | Wait 60s, retry up to 2 times. If still missing, ask user |
+| Container image not in GHCR after chart verification | Wait 60s, retry up to 2 times. If still missing, ask: investigate / proceed anyway / abort |
 | Timeout (5 min per workflow) | Show current status, ask: keep waiting / abort |
 | GitHub API rate limit | Back off to 30s polling interval, warn user |
 
@@ -130,8 +134,12 @@ Execute steps in order. Read the referenced file for each phase:
 - Always tag `$OSAC_REMOTE/main` to ensure the latest merged code is tagged.
 - The umbrella chart uses `workflow_dispatch` (not tag push) to allow explicit
   version control over component dependencies.
-- fulfillment-service also publishes container images and Go binaries via
-  separate workflows -- these are triggered by the same tag but are not
-  monitored by this skill (only the chart publish is critical).
+- Every component's tag push also triggers a separate image-build workflow
+  (see the Image Workflow column above), independent of `publish-charts.yaml`.
+  Step 6b verifies the image landed in GHCR -- a workflow missing the `v*` tag
+  trigger will pass chart verification but leave no image, which only
+  surfaces later as `ImagePullBackOff` in a running cluster.
+- fulfillment-service also publishes Go binaries via a separate workflow --
+  triggered by the same tag but not monitored by this skill.
 - The osac-installer is tagged after Step 8 verification (not after dispatch)
   to avoid tagging a failed release.
