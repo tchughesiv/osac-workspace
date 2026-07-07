@@ -41,7 +41,7 @@ Phases: `/e2e:ingest` → `/e2e:plan` → `/e2e:code` → `/e2e:validate` → `/
 ## Other Useful Skills
 
 - `/bugfix` — Systematic bug investigation and fix (phase-based)
-- `/debug-e2e` — Debug a failing Prow CI job using build logs and gathered OSAC artifacts
+- `/debug-e2e` — Debug a failing CI job using build logs and gathered OSAC artifacts
 - `/create-pr` — Runs repo-specific validation and creates a PR via the fork workflow
 - `/code-review` — Review your current diff before submitting
 
