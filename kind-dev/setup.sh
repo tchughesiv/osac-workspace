@@ -10,14 +10,20 @@
 #   ./setup.sh --cluster-only     # Kind cluster only (with CoreDNS *.localhost rewrite)
 #
 # Prerequisites:
-#   - podman (rootful — see below)
+#   - Docker (macOS) or podman (Linux/rootful — see below)
 #   - kind >= v0.20
 #   - helm >= v3.10
 #   - kubectl
 #   - openssl
-#   - inotify max_user_instances >= 256
+#   - python3 with requests module (for AWX configuration)
+#   - inotify max_user_instances >= 256 (Linux only)
 #
-# Rootful podman setup:
+# Container runtime:
+#   - macOS: Docker Desktop (auto-detected)
+#   - Linux: podman (rootful — see below)
+#   - Override: export KIND_EXPERIMENTAL_PROVIDER=docker (or podman)
+#
+# Rootful podman setup (Linux):
 #   - Host:      sudo is used directly (no extra setup needed)
 #   - Distrobox: install the systemd socket override on the host:
 #       sudo install -d /etc/systemd/system/podman.socket.d
@@ -27,9 +33,10 @@
 #       sudo systemctl daemon-reload && sudo systemctl restart podman.socket
 #
 # Environment variables:
-#   CLUSTER_NAME        Kind cluster name (default: osac-dev)
-#   OSAC_NAMESPACE      Namespace for OSAC services (default: osac)
-#   KEYCLOAK_NAMESPACE  Namespace for Keycloak (default: keycloak)
+#   CLUSTER_NAME                   Kind cluster name (default: osac-dev)
+#   OSAC_NAMESPACE                 Namespace for OSAC services (default: osac)
+#   KEYCLOAK_NAMESPACE             Namespace for Keycloak (default: keycloak)
+#   KIND_EXPERIMENTAL_PROVIDER     Container runtime: docker or podman (auto-detected)
 
 set -euo pipefail
 
@@ -52,7 +59,14 @@ AUTHORINO_VERSION="v0.23.1"
 # Networking — services are accessed as <service>.<namespace>.localhost
 EXTERNAL_INGRESS_PORT=8443
 INTERNAL_INGRESS_NODE_PORT=30443
-KIND_PROVIDER="${KIND_EXPERIMENTAL_PROVIDER:-podman}"
+INTERNAL_HTTP_NODE_PORT=30080
+
+# Auto-detect container runtime (prefer Docker on Mac, podman elsewhere)
+if [[ "$(uname -s)" == "Darwin" ]] && command -v docker >/dev/null 2>&1; then
+  KIND_PROVIDER="${KIND_EXPERIMENTAL_PROVIDER:-docker}"
+else
+  KIND_PROVIDER="${KIND_EXPERIMENTAL_PROVIDER:-podman}"
+fi
 
 # Detect distrobox: podman is a host-exec wrapper, sudo can't reach it.
 # On the host: use sudo for rootful podman (separate socket/namespace).
@@ -83,7 +97,10 @@ detect_podman_mode() {
 }
 
 kind_cmd() {
-  if [[ "$IN_DISTROBOX" == "true" ]]; then
+  if [[ "$KIND_PROVIDER" == "docker" ]]; then
+    # Docker mode — no sudo needed on Mac
+    KIND_EXPERIMENTAL_PROVIDER="${KIND_PROVIDER}" kind "$@"
+  elif [[ "$IN_DISTROBOX" == "true" ]]; then
     if [[ "${PODMAN_ROOTFUL:-0}" == "1" ]]; then
       systemd-run --scope --user \
         env KIND_EXPERIMENTAL_PROVIDER="${KIND_PROVIDER}" \
@@ -99,12 +116,19 @@ kind_cmd() {
   fi
 }
 
-podman_cmd() {
-  if [[ "$IN_DISTROBOX" == "true" ]]; then
+container_cmd() {
+  if [[ "$KIND_PROVIDER" == "docker" ]]; then
+    docker "$@"
+  elif [[ "$IN_DISTROBOX" == "true" ]]; then
     podman "$@"   # wrapper handles PODMAN_ROOTFUL
   else
     sudo podman "$@"
   fi
+}
+
+# Legacy alias for backward compatibility
+podman_cmd() {
+  container_cmd "$@"
 }
 
 # Colors
@@ -134,33 +158,62 @@ done
 
 check_prerequisites() {
   local missing=()
-  for cmd in podman kind helm kubectl openssl; do
+  for cmd in kind helm kubectl openssl; do
     command -v "$cmd" >/dev/null 2>&1 || missing+=("$cmd")
   done
+
+  # Check for container runtime
+  if [[ "$KIND_PROVIDER" == "docker" ]]; then
+    if ! command -v docker >/dev/null 2>&1; then
+      missing+=("docker")
+    fi
+  else
+    if ! command -v podman >/dev/null 2>&1; then
+      missing+=("podman")
+    fi
+  fi
+
   if [[ ${#missing[@]} -gt 0 ]]; then
     err "Missing required tools: ${missing[*]}"
     exit 1
   fi
 
-  if ! podman info >/dev/null 2>&1; then
-    err "Podman is not reachable. Ensure the podman socket is active."
-    err "  Host: systemctl --user start podman.socket"
-    err "  Distrobox: the podman wrapper should delegate to the host"
+  # Runtime-specific checks
+  if [[ "$KIND_PROVIDER" == "podman" ]]; then
+    if ! podman info >/dev/null 2>&1; then
+      err "Podman is not reachable. Ensure the podman socket is active."
+      err "  Host: systemctl --user start podman.socket"
+      err "  Distrobox: the podman wrapper should delegate to the host"
+      exit 1
+    fi
+    detect_podman_mode
+  else
+    if ! docker info >/dev/null 2>&1; then
+      err "Docker is not running. Start Docker Desktop or the Docker daemon."
+      exit 1
+    fi
+  fi
+
+  # inotify check (Linux only)
+  if [[ -f /proc/sys/fs/inotify/max_user_instances ]]; then
+    local max_instances
+    max_instances=$(cat /proc/sys/fs/inotify/max_user_instances 2>/dev/null || echo 0)
+    if [[ "$max_instances" -lt 256 ]]; then
+      err "inotify max_user_instances is ${max_instances} (need >= 256)"
+      err "Fix: sudo sysctl fs.inotify.max_user_instances=512"
+      err "Persist: echo 'fs.inotify.max_user_instances=512' | sudo tee /etc/sysctl.d/99-kind-inotify.conf"
+      exit 1
+    fi
+  fi
+
+  # Check for Python requests module (needed for AWX configuration)
+  if ! python3 -c "import requests" 2>/dev/null; then
+    err "Python 'requests' module not found (needed for AWX configuration)"
+    err "Install: python3 -m pip install requests"
     exit 1
   fi
 
-  detect_podman_mode
-
-  local max_instances
-  max_instances=$(cat /proc/sys/fs/inotify/max_user_instances 2>/dev/null || echo 0)
-  if [[ "$max_instances" -lt 256 ]]; then
-    err "inotify max_user_instances is ${max_instances} (need >= 256)"
-    err "Fix: sudo sysctl fs.inotify.max_user_instances=512"
-    err "Persist: echo 'fs.inotify.max_user_instances=512' | sudo tee /etc/sysctl.d/99-kind-inotify.conf"
-    exit 1
-  fi
-
-  log "All prerequisites met"
+  log "All prerequisites met (using ${KIND_PROVIDER})"
 }
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
@@ -197,7 +250,9 @@ create_cluster() {
     return 0
   fi
 
-  if [[ "$IN_DISTROBOX" != "true" ]] || [[ "${PODMAN_ROOTFUL:-0}" == "1" ]]; then
+  if [[ "$KIND_PROVIDER" == "docker" ]]; then
+    log "Creating kind cluster '${CLUSTER_NAME}' (Docker)..."
+  elif [[ "$IN_DISTROBOX" != "true" ]] || [[ "${PODMAN_ROOTFUL:-0}" == "1" ]]; then
     log "Creating kind cluster '${CLUSTER_NAME}' (rootful podman)..."
   else
     log "Creating kind cluster '${CLUSTER_NAME}' (rootless podman)..."
@@ -239,12 +294,15 @@ patch_coredns_localhost_rewrite() {
   log "Patching CoreDNS with generic *.localhost rewrite rule..."
 
   local new_corefile
-  new_corefile=$(echo "$corefile" | sed '/kubernetes cluster.local/i\
-    rewrite name keycloak.osac.localhost keycloak-external.keycloak.svc.cluster.local\
-    rewrite stop {\
-        name regex (.+)\\.(.+)\\.localhost {1}.{2}.svc.cluster.local\
-        answer name (.+)\\.(.+)\\.svc\\.cluster\\.local {1}.{2}.localhost\
-    }')
+  # Use awk for cross-platform compatibility (BSD/GNU sed differ on -i behavior)
+  new_corefile=$(echo "$corefile" | awk '/kubernetes cluster.local/ {
+    print "    rewrite name keycloak.osac.localhost keycloak-external.keycloak.svc.cluster.local"
+    print "    rewrite stop {"
+    print "        name regex (.+)\\.(.+)\\.localhost {1}.{2}.svc.cluster.local"
+    print "        answer name (.+)\\.(.+)\\.svc\\.cluster\\.local {1}.{2}.localhost"
+    print "    }"
+  }
+  {print}')
 
   kubectl -n kube-system create configmap coredns \
     --from-literal=Corefile="$new_corefile" \
@@ -283,6 +341,12 @@ install_trust_manager() {
     --wait --timeout 5m
 
   wait_for_crd "bundles.trust.cert-manager.io"
+
+  # Wait for trust-manager webhook to be ready
+  log "Waiting for trust-manager webhook..."
+  kubectl -n cert-manager wait --for=condition=Available deployment/trust-manager --timeout=60s
+  sleep 5  # Extra buffer for webhook to register
+
   log "trust-manager installed"
 }
 
@@ -373,6 +437,9 @@ spec:
           value:
             spec:
               ports:
+                - name: http
+                  port: 80
+                  nodePort: ${INTERNAL_HTTP_NODE_PORT}
                 - name: https
                   port: 443
                   nodePort: ${INTERNAL_INGRESS_NODE_PORT}
@@ -397,6 +464,12 @@ metadata:
 spec:
   gatewayClassName: default
   listeners:
+    - name: http
+      protocol: HTTP
+      port: 80
+      allowedRoutes:
+        namespaces:
+          from: All
     - name: tls
       protocol: TLS
       port: 443
@@ -407,7 +480,7 @@ spec:
           from: All
 EOF
 
-  log "Envoy Gateway configured with TLS passthrough on NodePort ${INTERNAL_INGRESS_NODE_PORT}"
+  log "Envoy Gateway configured with HTTP on NodePort ${INTERNAL_HTTP_NODE_PORT} and TLS passthrough on NodePort ${INTERNAL_INGRESS_NODE_PORT}"
 }
 
 install_authorino() {
@@ -561,7 +634,7 @@ spec:
   type: ClusterIP
 EOF
 
-  log "Keycloak installed — admin UI: https://keycloak.${KEYCLOAK_NAMESPACE}.localhost:${EXTERNAL_INGRESS_PORT}/admin"
+  log "Keycloak installed — admin UI: https://keycloak.${OSAC_NAMESPACE}.localhost:${EXTERNAL_INGRESS_PORT}/admin"
 }
 
 create_external_tlsroutes() {
@@ -678,12 +751,27 @@ deploy_osac() {
   helm dependency build "${chart_dir}" 2>&1 | tail -3
 
   log "Deploying OSAC via umbrella chart..."
+  # Deploy without waiting (console-proxy has TLS issues with self-signed certs)
   helm upgrade --install osac \
     "${chart_dir}" \
     --namespace "${OSAC_NAMESPACE}" \
     --create-namespace \
-    --values "${SCRIPT_DIR}/values-kind.yaml" \
-    --wait --timeout 10m
+    --values "${SCRIPT_DIR}/values-kind.yaml"
+
+  # Workaround: Remove console-proxy readiness probe (TLS verification fails with self-signed certs in kind)
+  log "Waiting for deployments to be ready..."
+  sleep 5  # Give helm time to create resources
+
+  if kubectl get deployment -n "${OSAC_NAMESPACE}" fulfillment-console-proxy >/dev/null 2>&1; then
+    kubectl patch deployment -n "${OSAC_NAMESPACE}" fulfillment-console-proxy \
+      --type=json \
+      -p='[{"op": "remove", "path": "/spec/template/spec/containers/0/readinessProbe"}]' 2>/dev/null || true
+  fi
+
+  # Wait for all deployments except we already patched console-proxy
+  kubectl wait --for=condition=Available --timeout=10m \
+    -n "${OSAC_NAMESPACE}" \
+    deployment --all 2>/dev/null || warn "Some deployments may not be ready"
 
   log "OSAC deployed via umbrella chart"
 }
@@ -699,6 +787,13 @@ deploy_osac_ui() {
 }
 
 register_hub() {
+  if ! command -v grpcurl >/dev/null 2>&1; then
+    warn "grpcurl not found — skipping automatic hub registration"
+    warn "Install grpcurl: brew install grpcurl (macOS) or go install github.com/fullstorydev/grpcurl/cmd/grpcurl@latest"
+    warn "Then register manually or re-run setup.sh"
+    return 0
+  fi
+
   log "Registering kind cluster as hub..."
 
   local hub_token
@@ -713,6 +808,7 @@ register_hub() {
   ca_data=$(kubectl config view --raw -o jsonpath='{.clusters[0].cluster.certificate-authority-data}')
 
   local kubeconfig
+  # base64 without line breaks (cross-platform: use tr -d '\n' instead of -w0)
   kubeconfig=$(printf '{
     "apiVersion": "v1",
     "kind": "Config",
@@ -720,16 +816,18 @@ register_hub() {
     "users": [{"name": "admin", "user": {"token": "%s"}}],
     "contexts": [{"name": "kind", "context": {"cluster": "kind", "user": "admin", "namespace": "%s"}}],
     "current-context": "kind"
-  }' "${ca_data}" "${hub_token}" "${OSAC_NAMESPACE}" | base64 -w0)
+  }' "${ca_data}" "${hub_token}" "${OSAC_NAMESPACE}" | base64 | tr -d '\n')
 
   local admin_token
   admin_token=$(kubectl -n "${OSAC_NAMESPACE}" create token admin)
 
-  grpcurl -insecure -H "Authorization: Bearer ${admin_token}" \
+  if grpcurl -insecure -H "Authorization: Bearer ${admin_token}" \
     -d "{\"object\":{\"metadata\":{\"name\":\"kind-dev\"},\"spec\":{\"kubeconfig\":\"${kubeconfig}\",\"namespace\":\"${OSAC_NAMESPACE}\"}}}" \
-    internal-api."${OSAC_NAMESPACE}".localhost:8443 osac.private.v1.Hubs/Create >/dev/null 2>&1
-
-  log "Hub registered — networking resources will now reconcile to CRs"
+    internal-api."${OSAC_NAMESPACE}".localhost:8443 osac.private.v1.Hubs/Create >/dev/null 2>&1; then
+    log "Hub registered — networking resources will now reconcile to CRs"
+  else
+    warn "Hub registration failed — see 'Open items' in summary for manual registration"
+  fi
 }
 
 # ── KubeVirt ───────────────────────────────────────────────────────────────────
@@ -742,7 +840,7 @@ install_multus() {
 
   log "Installing bridge CNI plugin into kind node..."
   local node_name="${CLUSTER_NAME}-control-plane"
-  podman_cmd exec "${node_name}" bash -c \
+  container_cmd exec "${node_name}" bash -c \
     'curl -sL https://github.com/containernetworking/plugins/releases/download/v1.6.2/cni-plugins-linux-amd64-v1.6.2.tgz | tar -C /opt/cni/bin -xz'
 
   log "Multus installed"
@@ -824,8 +922,12 @@ configure_awx() {
   local admin_pass awx_token project_id inv_id
   admin_pass=$(kubectl -n awx get secret awx-admin-password -o jsonpath='{.data.password}' | base64 -d)
 
+  # Kill any existing port-forward on 8052
+  lsof -ti:8052 | xargs kill -9 2>/dev/null || true
+  sleep 1
+
   # Port-forward for API access
-  kubectl -n awx port-forward svc/awx-service 8052:80 &
+  kubectl -n awx port-forward svc/awx-service 8052:80 >/dev/null 2>&1 &
   local pf_pid=$!
   sleep 3
 
@@ -833,19 +935,38 @@ configure_awx() {
   awx_token=$(curl -s -X POST http://localhost:8052/api/v2/tokens/ \
     -u "admin:${admin_pass}" \
     -H "Content-Type: application/json" \
-    -d '{"scope": "write"}' | python3 -c "import json,sys; print(json.load(sys.stdin)['token'])")
+    -d '{"scope": "write"}' | python3 -c "import json,sys; data=json.load(sys.stdin); print(data.get('token',''))")
+
+  if [[ -z "$awx_token" ]]; then
+    warn "Failed to create AWX token - AWX may not be ready yet"
+    kill $pf_pid 2>/dev/null || true
+    wait $pf_pid 2>/dev/null || true
+    return 1
+  fi
+
   log "AWX token created"
 
-  # Create inventory
-  inv_id=$(curl -s -X POST http://localhost:8052/api/v2/inventories/ \
+  # Create inventory (or get existing)
+  local inv_response
+  inv_response=$(curl -s -X POST http://localhost:8052/api/v2/inventories/ \
     -H "Authorization: Bearer ${awx_token}" \
     -H "Content-Type: application/json" \
-    -d '{"name": "OSAC Dev", "organization": 1}' | python3 -c "import json,sys; print(json.load(sys.stdin).get('id','error'))")
+    -d '{"name": "OSAC Dev", "organization": 1}')
 
+  inv_id=$(echo "$inv_response" | python3 -c "import json,sys; data=json.load(sys.stdin); print(data.get('id', ''))" 2>/dev/null)
+
+  # If creation failed (inventory exists), get it by name
+  if [[ -z "$inv_id" ]]; then
+    inv_id=$(curl -s -H "Authorization: Bearer ${awx_token}" \
+      "http://localhost:8052/api/v2/inventories/?name=OSAC+Dev" | \
+      python3 -c "import json,sys; data=json.load(sys.stdin); print(data['results'][0]['id'] if data.get('results') else '')")
+  fi
+
+  # Add localhost host (ignore if already exists)
   curl -s -X POST "http://localhost:8052/api/v2/inventories/${inv_id}/hosts/" \
     -H "Authorization: Bearer ${awx_token}" \
     -H "Content-Type: application/json" \
-    -d '{"name": "localhost", "variables": "ansible_connection: local"}' >/dev/null
+    -d '{"name": "localhost", "variables": "ansible_connection: local"}' >/dev/null 2>&1 || true
 
   # Disable collection sync (ansible.platform not available in open-source AWX)
   curl -s -X PATCH http://localhost:8052/api/v2/settings/jobs/ \
@@ -853,8 +974,9 @@ configure_awx() {
     -H "Content-Type: application/json" \
     -d '{"AWX_COLLECTIONS_ENABLED": false, "AWX_ROLES_ENABLED": false}' >/dev/null
 
-  # Create project from osac-aap repo
-  project_id=$(curl -s -X POST http://localhost:8052/api/v2/projects/ \
+  # Create project from osac-aap repo (or get existing)
+  local project_response
+  project_response=$(curl -s -X POST http://localhost:8052/api/v2/projects/ \
     -H "Authorization: Bearer ${awx_token}" \
     -H "Content-Type: application/json" \
     -d '{
@@ -864,18 +986,28 @@ configure_awx() {
       "scm_url": "https://github.com/osac-project/osac-aap.git",
       "scm_branch": "main",
       "scm_update_on_launch": false
-    }' | python3 -c "import json,sys; print(json.load(sys.stdin).get('id','error'))")
+    }')
+
+  # Extract project ID (handle both new creation and existing project)
+  project_id=$(echo "$project_response" | python3 -c "import json,sys; data=json.load(sys.stdin); print(data.get('id', ''))" 2>/dev/null)
+
+  # If creation failed (project exists), get it by name
+  if [[ -z "$project_id" ]]; then
+    project_id=$(curl -s -H "Authorization: Bearer ${awx_token}" \
+      "http://localhost:8052/api/v2/projects/?name=osac-aap" | \
+      python3 -c "import json,sys; data=json.load(sys.stdin); print(data['results'][0]['id'] if data.get('results') else '')")
+  fi
 
   # Wait for project sync
+  local proj_status="unknown"
   for i in $(seq 1 20); do
-    local status
-    status=$(curl -s -H "Authorization: Bearer ${awx_token}" \
+    proj_status=$(curl -s -H "Authorization: Bearer ${awx_token}" \
       "http://localhost:8052/api/v2/projects/${project_id}/" | \
-      python3 -c "import json,sys; print(json.load(sys.stdin).get('status','unknown'))")
-    if [[ "$status" == "successful" || "$status" == "failed" ]]; then break; fi
+      python3 -c "import json,sys; data=json.load(sys.stdin); print(data.get('status','unknown'))" 2>/dev/null || echo "unknown")
+    if [[ "$proj_status" == "successful" || "$proj_status" == "failed" ]]; then break; fi
     sleep 5
   done
-  log "AWX project synced: ${status}"
+  log "AWX project synced: ${proj_status}"
 
   # Create compute instance job templates (real playbooks + pod network override for kind)
   local compute_extra_vars
@@ -943,33 +1075,41 @@ create_step_modify_vm_spec_override:
   awx_runner_token=$(kubectl -n "${OSAC_NAMESPACE}" create token awx-runner --duration=87600h)
   cluster_ca=$(kubectl config view --raw -o jsonpath='{.clusters[0].cluster.certificate-authority-data}' | base64 -d)
 
-  python3 -c "
-import json, requests
-r = requests.post('http://localhost:8052/api/v2/credentials/',
-    headers={'Authorization': 'Bearer ${awx_token}', 'Content-Type': 'application/json'},
-    json={
-        'name': 'kind-cluster',
-        'organization': 1,
-        'credential_type': 17,
-        'inputs': {
-            'host': 'https://kubernetes.default.svc.cluster.local:443',
-            'bearer_token': '${awx_runner_token}',
-            'verify_ssl': True,
-            'ssl_ca_cert': '''${cluster_ca}'''
-        }
-    })
-cred_id = r.json().get('id')
-# Attach to all job templates
-for jt in requests.get('http://localhost:8052/api/v2/job_templates/',
-    headers={'Authorization': 'Bearer ${awx_token}'}).json()['results']:
-    requests.post(f'http://localhost:8052/api/v2/job_templates/{jt[\"id\"]}/credentials/',
-        headers={'Authorization': 'Bearer ${awx_token}', 'Content-Type': 'application/json'},
-        json={'id': cred_id})
-print(f'Credential {cred_id} attached to all templates')
-" 2>&1
+  # Create Kubernetes credential
+  local cred_response cred_id
+  cred_response=$(curl -s -X POST http://localhost:8052/api/v2/credentials/ \
+    -H "Authorization: Bearer ${awx_token}" \
+    -H "Content-Type: application/json" \
+    -d "{
+      \"name\": \"kind-cluster\",
+      \"organization\": 1,
+      \"credential_type\": 17,
+      \"inputs\": {
+        \"host\": \"https://kubernetes.default.svc.cluster.local:443\",
+        \"bearer_token\": \"${awx_runner_token}\",
+        \"verify_ssl\": true,
+        \"ssl_ca_cert\": $(echo "${cluster_ca}" | jq -Rs .)
+      }
+    }")
+  cred_id=$(echo "${cred_response}" | python3 -c "import json,sys; print(json.load(sys.stdin).get('id',''))")
 
-  kill $pf_pid 2>/dev/null
-  wait $pf_pid 2>/dev/null
+  # Attach credential to all job templates
+  local templates
+  templates=$(curl -s -H "Authorization: Bearer ${awx_token}" \
+    http://localhost:8052/api/v2/job_templates/ | \
+    python3 -c "import json,sys; print(' '.join(str(t['id']) for t in json.load(sys.stdin)['results']))")
+
+  for jt_id in ${templates}; do
+    curl -s -X POST "http://localhost:8052/api/v2/job_templates/${jt_id}/credentials/" \
+      -H "Authorization: Bearer ${awx_token}" \
+      -H "Content-Type: application/json" \
+      -d "{\"id\": ${cred_id}}" >/dev/null
+  done
+
+  log "Credential ${cred_id} attached to all templates"
+
+  kill $pf_pid 2>/dev/null || true
+  wait $pf_pid 2>/dev/null || true
 
   # Store AWX token as K8s secret for the operator
   kubectl -n "${OSAC_NAMESPACE}" create secret generic awx-token \
@@ -1003,11 +1143,22 @@ print_summary() {
     echo ""
   fi
 
-  info "Access (no /etc/hosts needed):"
+  if [[ "$(uname -s)" == "Darwin" ]]; then
+    # Test if *.localhost resolves automatically (macOS 14+ / Sonoma+)
+    if ! ping -c 1 -W 1 test.localhost >/dev/null 2>&1; then
+      warn "macOS Ventura and earlier require /etc/hosts entries for *.localhost domains:"
+      echo "  sudo tee -a /etc/hosts <<EOF"
+      echo "127.0.0.1 ui.${OSAC_NAMESPACE}.localhost api.${OSAC_NAMESPACE}.localhost internal-api.${OSAC_NAMESPACE}.localhost keycloak.${OSAC_NAMESPACE}.localhost"
+      echo "EOF"
+      echo ""
+    fi
+  fi
+
+  info "Access:"
   echo "  OSAC UI:          http://ui.${OSAC_NAMESPACE}.localhost:8080"
   echo "  OSAC API:         https://api.${OSAC_NAMESPACE}.localhost:${EXTERNAL_INGRESS_PORT}"
   echo "  OSAC Internal:    https://internal-api.${OSAC_NAMESPACE}.localhost:${EXTERNAL_INGRESS_PORT}"
-  echo "  Keycloak Admin:   https://keycloak.${KEYCLOAK_NAMESPACE}.localhost:${EXTERNAL_INGRESS_PORT}/admin  (admin/password)"
+  echo "  Keycloak Admin:   https://keycloak.${OSAC_NAMESPACE}.localhost:${EXTERNAL_INGRESS_PORT}/admin  (admin/password)"
   echo ""
   info "CLI quickstart:"
   echo "  cd fulfillment-service && go build -o osac ./cmd/osac"
