@@ -288,6 +288,16 @@ create_cluster() {
     --config "${SCRIPT_DIR}/kind-config.yaml" \
     --wait 60s
 
+  # Podman defaults pids_limit to 2048 per container. KubeVirt's install-strategy
+  # jobs need more threads than that — raise the limit on all Kind node containers.
+  if [[ "$KIND_PROVIDER" == "podman" ]]; then
+    log "Raising cgroup PID limit on Kind node containers (podman default is too low for KubeVirt)..."
+    for node in $(kind_cmd get nodes --name "${CLUSTER_NAME}" 2>/dev/null); do
+      container_cmd update --pids-limit 4096 "${node}" >/dev/null 2>&1 || \
+        warn "Could not raise PID limit on ${node} — KubeVirt may fail to install"
+    done
+  fi
+
   log "Kind cluster created"
 }
 
