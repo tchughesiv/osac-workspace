@@ -18,13 +18,14 @@ repo_status() {
   local dir="$1" name="$2"
   [[ -d "$dir" ]] || { printf "${GRAY}%s: not found${RESET}" "$name"; return; }
 
-  local behind
-  behind=$(git -C "$dir" rev-list HEAD..origin/main --count 2>/dev/null) || { printf "${GRAY}%s: ?${RESET}" "$name"; return; }
+  local branch behind
+  branch=$(git -C "$dir" branch --show-current 2>/dev/null) || branch="detached"
+  behind=$(git -C "$dir" rev-list HEAD..origin/main --count 2>/dev/null) || { printf "${GRAY}%s: %s ?${RESET}" "$name" "$branch"; return; }
 
   if [[ "$behind" -eq 0 ]]; then
-    printf "${GREEN}%s: current${RESET}" "$name"
+    printf "${GREEN}%s: %s ✓${RESET}" "$name" "$branch"
   else
-    printf "${YELLOW}%s: %d behind${RESET}" "$name" "$behind"
+    printf "${YELLOW}%s: %s ↓%d behind${RESET}" "$name" "$branch" "$behind"
   fi
 }
 
