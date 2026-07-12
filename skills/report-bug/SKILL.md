@@ -28,21 +28,9 @@ Collect from conversation context. Ask only if truly ambiguous:
 | Attachments | No | Logs, screenshots, or config files from conversation context |
 | Assignee | No | Unassigned — only assign if user specifies |
 
-## Writing Rules
-
-Describe the bug from the user's perspective. Every sentence should describe something a user can see, do, or experience.
-
-**Do:**
-- Describe what the user did (CLI commands, API calls, UI actions)
-- Describe what the user expected to see
-- Describe what actually happened (error messages, wrong behavior, missing data)
-- Use product concepts: cluster, tenant, token, catalog item -- not code concepts
-
-**Do not:**
-- Reference code internals: function/method names, file paths, line numbers, database columns
-- Include sections that analyze why the bug happens or what it affects internally -- those belong in the fix PR, not the bug ticket
-
 ## Pre-Creation Check
+
+Describe from the user's perspective — what they did (CLI commands, API calls, UI actions), what they expected to happen, and what they saw happening (error messages, wrong behavior, missing data). Use product concepts (cluster, tenant, token), not code concepts (function names, file paths, database columns).
 
 Before creating the ticket, verify you can answer these with user-facing information:
 
@@ -86,7 +74,7 @@ Do not use Jira wiki markup (`*bold*`, `{{code}}`, `{code}`, `[text|url]`).
 ```bash
 KEY=$(jira issue create -t Bug --project OSAC \
   --summary "<concise bug title>" \
-  --body "**What happened:**
+  --body "**Description of the problem:**
 
 <describe the problem>
 
