@@ -20,12 +20,13 @@ for arg in "$@"; do
   esac
 done
 
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-NC='\033[0m'
-log()  { echo -e "${GREEN}[+]${NC} $*"; }
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-KIND_BIN="$(which kind)"
+# Source runtime detection, kind_cmd(), and helpers (log, err, etc.) from setup.sh
+# shellcheck source=setup.sh
+source "${SCRIPT_DIR}/setup.sh"
+detect_podman_mode
+
 KC_FILE="${HOME}/.kube/${CLUSTER_NAME}-kind.kubeconfig"
 
 if [[ "$KEEP_DATA" == "true" ]]; then
@@ -37,10 +38,14 @@ if [[ "$KEEP_DATA" == "true" ]]; then
   helm uninstall postgres -n osac 2>/dev/null || true
 
   log "OSAC services uninstalled. Cluster '${CLUSTER_NAME}' still running."
-  log "To delete the cluster: sudo kind delete cluster --name ${CLUSTER_NAME}"
+  log "To delete the cluster: $0"
 else
   log "Deleting kind cluster '${CLUSTER_NAME}'..."
-  sudo "${KIND_BIN}" delete cluster --name "${CLUSTER_NAME}" 2>/dev/null || true
-  log "Cluster deleted"
+  if kind_cmd delete cluster --name "${CLUSTER_NAME}"; then
+    log "Cluster deleted"
+  else
+    err "Failed to delete cluster '${CLUSTER_NAME}'"
+    exit 1
+  fi
   log "Kubeconfig at ${KC_FILE} — remove manually if no longer needed"
 fi

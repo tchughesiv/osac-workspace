@@ -1511,4 +1511,7 @@ main() {
   print_summary
 }
 
-main "$@"
+# Guard: skip main when sourced by other scripts (e.g. teardown.sh)
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+  main "$@"
+fi
