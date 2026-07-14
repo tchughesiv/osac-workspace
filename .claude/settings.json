@@ -29,7 +29,7 @@
           {
             "type": "command",
             "command": "bash .claude/hooks/update-ai-context.sh",
-            "timeout": 15
+            "timeout": 20
           }
         ]
       }
