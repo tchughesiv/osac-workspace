@@ -117,15 +117,38 @@ Do NOT create tasks until user confirms.
 
 ### Step 5: Create Tasks
 
-Once confirmed, create each Jira task.
+Once confirmed, create each Jira task using the Safe create pattern in `jira-task-management` (source `tools/jira-safe-create.sh` once, then `new_temp` + `add_temp` per task).
 
 #### For Each Action Item
 
 ```bash
+# Once before the loop (if not already sourced):
+source "$(git rev-parse --show-toplevel)/tools/jira-safe-create.sh"
+
+BODY=$(new_temp osac-task-body)
+add_temp "$BODY"
+OUT=$(new_temp osac-jira-out)
+add_temp "$OUT"
+ERR=$(new_temp osac-jira-err)
+add_temp "$ERR"
+
+cat >"$BODY" <<'EOF'
+**Action Item from Meeting Notes**
+
+**Task:** Original action item text
+
+**Context:**
+Meeting title/date
+Relevant discussion points
+EOF
+
 jira issue create -tTask \
   -s "Task description" \
-  -b $'**Action Item from Meeting Notes**\n\n**Task:** Original action item text\n\n**Context:**\nMeeting title/date\nRelevant discussion points' \
-  -P <EPIC-KEY> -a <assignee> -l OSAC --no-input
+  --template "$BODY" \
+  -P <EPIC-KEY> -a <assignee> -l OSAC --no-input --raw >"$OUT" 2>"$ERR" </dev/null
+
+KEY=$(jq -r '.key // empty' "$OUT")
+# On empty key or failure: cat "$ERR" >&2
 ```
 
 #### Task Summary Format

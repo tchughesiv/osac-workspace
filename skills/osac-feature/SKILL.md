@@ -125,23 +125,13 @@ Only continue when the user answers yes.
 
 ## Reusable bash patterns
 
-Define once before any Jira create. Reference these helpers from each create
-step instead of duplicating temp setup, key validation, or `--plain` parsing.
+Define once before any Jira create: source `tools/jira-safe-create.sh` (see
+`jira-task-management` Safe create pattern), then define skill-specific helpers
+below. Reference these from each create step instead of duplicating key
+validation or `--plain` parsing.
 
 ```bash
-TEMP_FILES=()
-cleanup() { rm -f "${TEMP_FILES[@]}"; }
-trap cleanup EXIT
-
-add_temp() { TEMP_FILES+=("$1"); }
-
-new_temp() {
-  local prefix=${1:-osac-jira}
-  local f
-  f=$(mktemp "${TMPDIR:-/tmp}/${prefix}.XXXXXX")
-  add_temp "$f"
-  echo "$f"
-}
+source "$(git rev-parse --show-toplevel)/tools/jira-safe-create.sh"
 
 # After jq -r '.key // empty' — stop on empty/malformed keys
 require_osac_key() {
@@ -199,8 +189,11 @@ Safe-create rules (all create/edit steps):
 
 ```bash
 BODY=$(new_temp osac-feature-body)
+add_temp "$BODY"
 OUT=$(new_temp osac-jira-out)
+add_temp "$OUT"
 ERR=$(new_temp osac-jira-err)
+add_temp "$ERR"
 # ... jira issue create ... >"$OUT" 2>"$ERR" </dev/null
 KEY=$(jq -r '.key // empty' "$OUT")
 require_osac_key "$KEY" "Feature" "$OUT" "$ERR"
@@ -263,9 +256,12 @@ Safe-create — use patterns above (`new_temp`, `require_osac_key`):
 
 ```bash
 BODY=$(new_temp osac-feature-body)
+add_temp "$BODY"
 # write markdown body to $BODY, then:
 OUT=$(new_temp osac-jira-feature-out)
+add_temp "$OUT"
 ERR=$(new_temp osac-jira-feature-err)
+add_temp "$ERR"
 
 FEATURE_LABELS=(--label OSAC)
 [ "$REQUIRES_UI" = "yes" ] && FEATURE_LABELS+=(--label osac-ux --label osac-ui)
@@ -290,6 +286,7 @@ If user specified an assignee:
 
 ```bash
 ASSIGN_ERR=$(new_temp osac-jira-assign-err)
+add_temp "$ASSIGN_ERR"
 if ! jira issue assign "$KEY" "$ASSIGNEE" 2>"$ASSIGN_ERR"; then
   echo "Assign failed for ${KEY} — continuing bootstrap" >&2
   cat "$ASSIGN_ERR" >&2
@@ -343,7 +340,9 @@ any retry.
 ```bash
 if [ -z "${EPIC_KEY:-}" ]; then
   OUT=$(new_temp osac-jira-epic-out)
+  add_temp "$OUT"
   ERR=$(new_temp osac-jira-epic-err)
+  add_temp "$ERR"
 
   jira issue create -t Epic --project OSAC \
     -s "${EPIC_SUMMARY}" \
@@ -361,6 +360,7 @@ Allow up to 3 minutes for epic create to complete (typically seconds with `</dev
 
 ```bash
 EPIC_ERR=$(new_temp osac-jira-epic-err)
+add_temp "$EPIC_ERR"
 PARENT=$(jira issue view "${EPIC_KEY}" --raw | jq -r '.fields.parent.key // empty')
 if [ "$PARENT" != "$KEY" ]; then
   jira issue edit "${EPIC_KEY}" -P "${KEY}" --no-input 2>>"$EPIC_ERR" </dev/null
@@ -424,8 +424,11 @@ create** when the parent is a Feature; tasks under an epic accept `-P` normally.
 
 ```bash
 TASK_BODY=$(new_temp osac-bootstrap-task)
+add_temp "$TASK_BODY"
 OUT=$(new_temp osac-jira-task-out)
+add_temp "$OUT"
 ERR=$(new_temp osac-jira-task-err)
+add_temp "$ERR"
 
 cat >"$TASK_BODY" <<EOF
 Draft, submit, and merge the Product Requirements Document.
@@ -546,5 +549,5 @@ Features should include these sections (in `$BODY`):
 - Jira hierarchy: Feature → Bootstrap epic → gate tasks (PRD, Design, [UX Design, UI Design])
 - Bootstrap epic: create without `-P`, then `jira issue edit -P` — Epic create with `-P` on a Feature parent returns HTTP 400; use `</dev/null` on all jira create/edit to avoid stdin hangs (jira-cli#948)
 - Gate tasks track documentation milestones, not implementation work
-- Temp files: `new_temp` + `TEMP_FILES`/`trap` cleanup — see Reusable bash patterns
+- Temp files: source `tools/jira-safe-create.sh`; call `add_temp` in the parent shell after each `new_temp` — see `jira-task-management` Safe create pattern
 - jira-cli handles markdown-to-ADF conversion automatically

@@ -68,11 +68,19 @@ Once the epic is known, detect the version before confirming inputs with the use
 
 ## Create the Bug
 
-Use the safe create pattern from `jira-task-management` — write the body to a template file, run create directly (not inside `$(...)`), then parse the key from the output file:
+Use the safe create pattern in `jira-task-management` — source `tools/jira-safe-create.sh`, write the body to a temp file, run create directly (not inside `$(...)`), capture stdout/stderr separately:
 
 ```bash
-# 1. Write body to a temp file (see jira-task-management for why)
-cat > /tmp/bug-body.md <<'EOF'
+source "$(git rev-parse --show-toplevel)/tools/jira-safe-create.sh"
+
+BODY=$(new_temp osac-bug-body)
+add_temp "$BODY"
+OUT=$(new_temp osac-jira-out)
+add_temp "$OUT"
+ERR=$(new_temp osac-jira-err)
+add_temp "$ERR"
+
+cat >"$BODY" <<'EOF'
 **Description of the problem:**
 
 <describe the problem>
@@ -98,28 +106,28 @@ cat > /tmp/bug-body.md <<'EOF'
 _This bug was reported with AI assistance. Review for accuracy_
 EOF
 
-# 2. Create directly; allow up to 3 minutes — do not kill and retry
 jira issue create -t Bug --project OSAC \
   --summary "<concise bug title>" \
-  --template /tmp/bug-body.md \
+  --template "$BODY" \
   --label OSAC \
   --affects-version "<version>" \
-  --no-input --raw > /tmp/jira-create.out
+  --no-input --raw >"$OUT" 2>"$ERR" </dev/null
 
-# 3. Parse key from output file
-KEY=$(jq -r '.key' /tmp/jira-create.out)
+KEY=$(jq -r '.key // empty' "$OUT")
+# On empty key or failure: cat "$ERR" >&2
 ```
 
 Omit `--affects-version` if no version was resolved.
 
 **Key extraction notes:**
-- Use `--raw` and parse with `jq -r '.key'` from the output file — not from a command substitution around `jira issue create`.
+- Use `--raw` with stdout/stderr temps; parse with `jq -r '.key // empty' "$OUT"` — not from a command substitution around `jira issue create`.
+- Do **not** wrap create in `$(...)` or hide stderr with `2>/dev/null`.
 - Do **not** use `grep -oP` on the text output — it can match multiple keys in the URL or fail silently.
 
 ### Link to epic
 
 ```bash
-jira issue edit $KEY -P <EPIC-KEY> --no-input
+jira issue edit $KEY -P <EPIC-KEY> --no-input </dev/null
 ```
 
 If user specified an assignee (no `--no-input` flag — `assign` does not support it):

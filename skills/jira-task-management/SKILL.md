@@ -42,20 +42,35 @@ A slow `jira issue create` can look hung while the API call is still in flight. 
 jira issue list -q 'summary ~ "exact or distinctive summary phrase"' --plain
 ```
 
-**Safe create pattern** — use a template file, run create directly (not inside `$(...)`), allow up to 3 minutes:
+**Safe create pattern** — use per-run temp files with cleanup, run create directly (not inside `$(...)`), capture stderr (never `2>/dev/null`), allow up to 3 minutes:
 
 ```bash
-# 1. Write body to a temp file (do not inline large heredocs in --body)
-jira issue create -tTask -s "Summary" \
-  --template /tmp/issue-body.md \
-  -l OSAC --no-input --raw > /tmp/jira-create.out
+# Load shared temp helpers (from osac-workspace root)
+source "$(git rev-parse --show-toplevel)/tools/jira-safe-create.sh"
 
-# 2. Parse key from output file
-KEY=$(jq -r '.key' /tmp/jira-create.out)
+# Single create — write body, capture stdout and stderr separately
+# Register each path in the parent shell (add_temp inside $(...) runs in a subshell)
+BODY=$(new_temp osac-jira-body)
+add_temp "$BODY"
+OUT=$(new_temp osac-jira-out)
+add_temp "$OUT"
+ERR=$(new_temp osac-jira-err)
+add_temp "$ERR"
+# Write description to $BODY (heredoc or editor) — do not inline large bodies in --body
+
+jira issue create -tTask -s "Summary" \
+  --template "$BODY" \
+  -l OSAC --no-input --raw >"$OUT" 2>"$ERR"
+
+KEY=$(jq -r '.key // empty' "$OUT")
+# On empty key or failure: cat "$ERR" >&2 — do not hide errors with 2>/dev/null
 ```
+
+Helpers live in `tools/jira-safe-create.sh` — child skills (`osac-feature`, `report-bug`, etc.) should source that script instead of copying the functions. Multi-step flows call `new_temp` for each create step and `add_temp` in the parent shell after each assignment. Key-validation helpers belong in those child skills, not here.
 
 **Use the safe create pattern above for every issue create.** Do not use command substitution or kill a create mid-flight:
 
+**Never do this:**
 - `KEY=$(jira issue create ... --body "$(cat <<'EOF' ... EOF)" 2>/dev/null | jq -r '.key')` — no stdout until done; stderr hidden; looks hung for minutes
 - `KEY=$(jira issue create ...)` — same problem when create is wrapped in command substitution
 - Kill a running create and immediately retry
@@ -231,6 +246,6 @@ jira open           # Open project page
 - **Auth errors / HTML in response:** Token may be expired. Regenerate at https://id.atlassian.com/manage-profile/security/api-tokens, update `~/.netrc`.
 - **"API v3" errors:** Config must use `installation: Cloud`. Re-run `jira init --installation cloud`.
 - **Interactive prompts hang:** Always pass `--no-input` for create/edit operations.
-- **Create looks hung / duplicates:** Large inline `--body` inside `$(...)` with `2>/dev/null` produces no output for minutes while the API works. Use `--template` and `--raw` to a file; wait up to 3 min; never kill-and-retry. See "Preventing duplicate creates" above.
+- **Create looks hung / duplicates:** Large inline `--body` inside `$(...)` with `2>/dev/null` produces no output for minutes while the API works. Use `--template` and `--raw` with mktemp files for stdout and stderr; wait up to 3 min; never kill-and-retry. See "Preventing duplicate creates" above.
 - **`--debug` flag:** Shows the actual REST API calls — useful for diagnosing unexpected behavior.
 - **Current user:** `jira me` returns the authenticated username.
