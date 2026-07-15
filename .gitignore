@@ -65,6 +65,10 @@ osac-ui/
 enhancement-proposals/
 bare-metal-fulfillment-operator/
 host-management-openstack/
+
+# Bootstrap-managed reference repos (cloned read-only, no fork remote)
+osac-ux/
+
 docs/*
 !docs/pr-dashboard/
 docs/pr-dashboard/data.json
