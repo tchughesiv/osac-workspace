@@ -36,6 +36,10 @@ Install Go, Node.js, buf, kubectl, kind, jira CLI, gh CLI directly.
 
 Re-run `./bootstrap.sh` anytime to update all repos to latest `main`.
 
+## Local Runtime
+
+See [`kind-dev/README.md`](kind-dev/README.md) for a lightweight kind-based dev environment running the full OSAC stack locally (no OpenShift required).
+
 ## Repository Structure
 
 Meta-workspace — run `./bootstrap.sh` to clone/update all component repos to latest `main`. **In component repos, read `CLAUDE.md` first** (progressive disclosure). Use that component's `AGENTS.md` where the table below shows **Yes** for tool-agnostic build/test conventions.
