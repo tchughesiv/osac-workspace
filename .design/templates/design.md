@@ -210,17 +210,29 @@ to implement the design.  For instance,
 
 **Note:** *Section not required until targeted at a release.*
 
-Consider the following in developing a test plan for this enhancement:
-- Will there be e2e and integration tests, in addition to unit tests?
-- How will it be tested in isolation vs with other components?
-- What additional testing is necessary to support managed OpenShift service-based offerings?
+List concrete test scenarios for each test type, with enough detail that an
+implementer knows what to build.
 
-No need to outline all of the test cases, just the general strategy. Anything
-that would count as tricky in the implementation and anything particularly
-challenging to test should be called out.
+### Unit Tests
 
-All code is expected to have adequate tests (eventually with coverage
-expectations).
+List specific behaviors to unit-test (e.g., "validation rejects overlapping
+CIDRs", "status condition transitions from Pending to Provisioned").
+
+### Integration Tests
+
+List scenarios that exercise the component with its real dependencies in a
+kind cluster (e.g., "creating a VirtualNetwork reconciles the namespace and
+network resources", "deleting a parent resource cascades to children").
+Integration tests are the primary test layer for controller and server logic.
+
+### E2E Tests
+
+List user-facing workflows that span multiple components (e.g., "tenant
+creates a ComputeInstance attached to a Subnet and reaches it via PublicIP").
+Reference osac-test-infra pytest patterns.
+
+Call out anything tricky to test: CIDR parsing, dual-stack, concurrent
+reconciliation, AAP job coordination, etc.
 
 ## Graduation Criteria
 

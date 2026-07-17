@@ -147,7 +147,8 @@ This is where technical depth lives. Include:
 
 ### Test Plan
 
-- Describe the testing strategy: unit, integration (kind cluster), e2e.
+- List concrete test scenarios under each sub-section (Unit, Integration, E2E) — not general strategy.
+- Each scenario should be specific enough that an implementer knows what to build (e.g., "validation rejects overlapping CIDRs" not "test validation").
 - Call out tricky areas: CIDR parsing, dual-stack, concurrent reconciliation.
 - Reference OSAC test patterns: Ginkgo for unit/integration tests, pytest for e2e (via osac-test-infra).
 - If details depend on implementation: "Test plan will be developed during implementation. Expected coverage: [describe what will be tested]."
