@@ -25,7 +25,7 @@ make rebuild                   # Rebuild image from scratch
 
 ### Option B: Local toolchain
 
-Install Go, Node.js, buf, kubectl, kind, jira CLI, gh CLI directly.
+Install Go, Node.js, buf, kubectl, kind, jira CLI, gh CLI, jq directly.
 
 ### Bootstrap
 
