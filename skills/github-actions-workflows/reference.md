@@ -326,6 +326,45 @@ of them" are just as independent as "detection" and "purge" were - give the
 upload step an `id`, check `steps.<id>.outcome`, and only promise the
 artifact link when it's actually there.
 
+## Don't re-echo redacted diagnostics
+
+Redacting files before `actions/upload-artifact` is necessary but not
+sufficient if a later step reprints those files (or a `grep -C` around
+them) into the job console. Found on `osac-test-infra`'s
+`gather-osac-logs.sh` after OSAC-1684's scanner landed: plaintext
+`"break_glass_credentials":{...}` in fulfillment logs was already
+redacted in the artifact, but the same passwords also appeared
+**base64-encoded inside SQL DEBUG parameters**. A new "failure summary"
+that grepped `error|panic|fatal` with `-C3` and `echo`'d the matches
+into the Gather artifacts step log re-introduced those blobs into the
+*workflow run logs* - which is what `scan-e2e-logs.yml` scans - so every
+green e2e still tripped "Credential(s) detected" on Slack.
+
+Two independent mistakes, both required:
+
+1. **Encoding gap.** Plaintext JSON redaction never sees a base64 payload.
+   JWT-shaped redaction (`eyJ.a.b`) misses single-segment base64 JSON.
+   Substring-matching the base64 of the key name
+   (`YnJlYWtfZ2xhc3NfY3JlZGVudGlhbHM` for `break_glass_credentials`) is
+   alignment-fragile - embedding the key at an arbitrary byte offset does
+   not preserve a stable base64 substring. Decode each quoted candidate
+   (standard and URL-safe) and look for the key in the plaintext.
+2. **Re-echo gap.** Even a perfect artifact redaction is undone if the
+   job log reprints the pre-fix content (or a redaction miss) via
+   `grep -C` / `cat` / `$GITHUB_STEP_SUMMARY`. Keep the full dump in the
+   artifact; print only a count/pointer to the console.
+
+Related: quoted password/token sed classes that only allow
+`[A-Za-z0-9+/=]` miss real passwords with punctuation (`@`, `%`, `#`) -
+use `[^"]+` (or equivalent) for the value.
+
+Separately, when a post-run scanner *does* find credentials in an
+otherwise-green run, don't post the notify as `status: failure` for the
+upstream e2e workflow name - that reads as "e2e FAILED" to anyone
+blessing PRs. Use `warning` (or similar) when detection and remediation
+both succeeded; keep `failure` for scan/purge hard failures. Same
+axis-splitting idea as [detection vs. remediation](#detection-vs-remediation-status).
+
 ## Shared scripts
 
 Copy-pasting the same bash logic into multiple `run:` blocks - especially

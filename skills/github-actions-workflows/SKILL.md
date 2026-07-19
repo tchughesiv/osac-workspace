@@ -13,8 +13,11 @@ cycle - most from OSAC-2185 (5 repos, 4 review rounds each), the notification/
 status-aggregation/secret-handling/branch-restriction items from OSAC-1684
 (`osac-test-infra` PR #182, a credential-scanning workflow, 3 separate review
 cycles across the initial round, a rebase, and a follow-up fix commit - each
-triggering its own fresh CodeRabbit pass). Apply them proactively - don't
-wait for a reviewer to find them.
+triggering its own fresh CodeRabbit pass), and the log-redaction /
+notify-status lessons from the OSAC-1684 follow-ups (gather scripts echoing
+"redacted" diagnostics back into the job console, and Slack treating
+credential-only findings as FAILED). Apply them proactively - don't wait for
+a reviewer to find them.
 
 ## Checklist
 
@@ -166,6 +169,34 @@ Run through this for every new or edited workflow file:
       problem" and "successfully fixed it" into one status flag, or a
       failed fix silently reads as a successful one. See
       [reference.md](reference.md#detection-vs-remediation-status).
+- [ ] **Don't equate "credential found" with "workflow failed" in
+      notifications.** A post-run log scanner (or similar) can find secrets
+      in an otherwise-green e2e run; posting Slack/`notify-slack` as
+      `status: failure` makes the *e2e* look FAILED even when
+      `github.event.workflow_run.conclusion` was `success`, which blocks
+      blessing. Keep real failures (scan hard-fail, purge failed, couldn't
+      fetch logs) as `failure`, and use a distinct `warning` (or equivalent)
+      when detection succeeded *and* remediation succeeded. Same spirit as
+      detection-vs-remediation - the notify status is yet another axis.
+- [ ] **Never dump "already-redacted" diagnostics back into the job
+      console.** Grepping gathered artifacts with context (`grep -C`,
+      `error|panic|fatal` sweeps, etc.) and `echo`-ing the match into the
+      step log / `$GITHUB_STEP_SUMMARY` re-exposes secrets into the
+      *workflow run logs* - exactly what a post-run credential scanner
+      then flags - even when the uploaded artifact was mostly clean. Write
+      the full dump to a file in the artifact and print only a count /
+      pointer in the job log. See
+      [reference.md](reference.md#dont-re-echo-redacted-diagnostics).
+- [ ] **Redact every encoding of a secret, not just the plaintext form.**
+      Matching `"break_glass_credentials":{...}` (or `"password":"..."`)
+      is not enough if the same payload also appears base64-encoded inside
+      SQL/DEBUG lines. Substring-matching the key's own base64 is
+      alignment-fragile (embedding at an arbitrary byte offset does not
+      preserve a stable base64 substring) - decode candidate blobs and
+      inspect the plaintext. Password/token character classes must allow
+      punctuation too (`[^"]+`, not `[A-Za-z0-9+/=]`), or real passwords
+      with `@`/`%`/`#` slip through. See
+      [reference.md](reference.md#dont-re-echo-redacted-diagnostics).
 - [ ] **A same-file `if:` conditional is not a security boundary against ref
       selection.** For `workflow_dispatch` (or anything else where the
       invoker picks which ref's copy of the workflow runs), a check like
@@ -340,8 +371,9 @@ for the full fork/branch/attribution conventions.
 ## Additional resources
 
 - [reference.md](reference.md) - semver regex, documented-endpoint gotchas,
-  live-testing traps, and niche bash-script pitfalls (IFS joins, shallow
-  submodule clones, run-attempt collisions).
+  live-testing traps, log-redaction / re-echo pitfalls, and niche
+  bash-script pitfalls (IFS joins, shallow submodule clones, run-attempt
+  collisions).
 - Each component repo's standing rules directory (e.g. `.claude/rules/`,
   `.cursor/rules/` - whichever your agent uses) for the full GitHub Actions
   security/maintainability/bash-safety rules this skill was distilled from.
