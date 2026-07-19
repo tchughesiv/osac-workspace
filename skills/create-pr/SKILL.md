@@ -5,7 +5,7 @@ description: Create a pull request on an OSAC component repo using the fork-base
 
 # Create Pull Request
 
-Create a pull request on an OSAC component repository using the fork-based workflow.
+Create a PR on an OSAC component repo using the fork-based workflow.
 
 **Announce at start:** "Using the create-pr skill to validate and submit a PR."
 

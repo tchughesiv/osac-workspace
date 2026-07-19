@@ -82,17 +82,14 @@ to a criterion pull that criterion's score toward 0.
 Are the technical decisions sound and consistent with OSAC patterns?
 
 Check:
-- [ ] Resource hierarchy uses owner reference annotations (`osac.openshift.io/owner-reference`)
-- [ ] Tenant isolation includes `osac.openshift.io/tenant` annotation on all new resources
+- [ ] Owner reference (`osac.openshift.io/owner-reference`) and tenant isolation (`osac.openshift.io/tenant`) annotations present on all new resources
 - [ ] API conventions per `fulfillment-service/docs/API.md`: standard object shape (`id`, `Metadata`, `<Type>Spec`, `<Type>Status`), spec/status ownership, declarative intent-based design (no imperative methods), naming conventions
 - [ ] Spec contains only desired state (user-controlled); status contains only observed state (system-controlled)
 - [ ] Controller patterns: finalizer → status update → provisioning lifecycle
 - [ ] Conditions used for lifecycle state (preferred over phase enums for new resources)
-- [ ] Maps avoided in CRDs — prefer lists of named subobjects
-- [ ] Dependencies between components identified with ordering
+- [ ] Maps avoided in CRDs (prefer lists of named subobjects); pluggable architectures preferred over hardcoded implementations
+- [ ] Dependencies between components identified with ordering, and cross-repo impacts enumerated
 - [ ] Integration with existing services described
-- [ ] Pluggable architectures preferred over hardcoded implementations
-- [ ] Cross-repo impacts enumerated
 - [ ] Breaking changes called out with migration strategies
 - [ ] Terminology defined upfront and used consistently throughout
 
@@ -100,7 +97,7 @@ Check:
 - 1 = Core patterns followed but gaps — some conventions missed, integration partially described, inconsistent terminology
 - 2 = All OSAC patterns followed, dependencies clear, integration well-described, terminology consistent
 
-**Calibration examples:**
+##### Calibration Examples
 
 - A=0: Design introduces new CRDs without tenant annotation, uses direct DB access instead of gRPC, proto schemas don't follow standard object shape, doesn't mention which repos need changes.
 - A=1: Design follows controller patterns and has tenant isolation, proto schemas use standard object shape but mix spec/status ownership (e.g., user-modifiable fields in status), doesn't describe interaction with osac-aap for provisioning.

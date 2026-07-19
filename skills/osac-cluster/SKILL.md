@@ -197,13 +197,15 @@ cluster-tool flavors --server <alias>     # On specific server
 
 ## Step 4: Boot a cluster
 
+**Read [pull-secret-and-license.md](references/pull-secret-and-license.md)** if pull secret and AAP license paths are not already set up.
+
 ```bash
 cluster-tool boot --flavor vmaas --name <name> --pull-secret <path-to-pull-secret.json> --server <alias>
 ```
 
 - **`--flavor`** — which snapshot to boot from (must be pulled first)
 - **`--name`** — short identifier, **max 8 characters** (e.g., `dev`, `test1`, `pr-42`). Linux bridge names are `br-{name[:8]}`, so longer names cause collisions.
-- **`--pull-secret`** — **(mandatory)** path to a pull secret JSON file for authenticated registry access. See [Obtaining a Pull Secret and AAP License](#obtaining-a-pull-secret-and-aap-license) below.
+- **`--pull-secret`** — **(mandatory)** path to a pull secret JSON file for authenticated registry access. See [pull-secret-and-license.md](references/pull-secret-and-license.md).
 - **`--server`** — which server to boot on (omit to use default)
 
 **Example:**
@@ -246,158 +248,9 @@ wait
 
 ---
 
-## Obtaining a Pull Secret and AAP License
-
-Both the `boot` command and the refresh script require a **pull secret** and an **AAP license**. Place these files in the osac-installer repo under the values directory for your deployment type:
-
-| Deployment type | Pull secret path | AAP license path |
-|----------------|-----------------|-----------------|
-| VMaaS | `values/vmaas-ci/pull-secret.json` | `values/vmaas-ci/license.zip` |
-| CaaS | `values/caas-ci/pull-secret.json` | `values/caas-ci/license.zip` |
-
-### Pull secret
-
-A pull secret provides credentials for authenticated container registries (Quay.io, registry.redhat.io). Obtain one from the [Red Hat Hybrid Cloud Console](https://console.redhat.com/openshift/install/pull-secret).
-
-Download the JSON file and place it at the path above (e.g., `values/vmaas-ci/pull-secret.json`).
-
-### AAP license
-
-The AAP bootstrap job requires a subscription manifest (`license.zip`). Obtain it from the [Red Hat Customer Portal](https://access.redhat.com/) under **Subscriptions > Subscription Allocations > Export Manifest**.
-
-Place `license.zip` at the path above (e.g., `values/vmaas-ci/license.zip`).
-
-For full details, see [Section 2.4 of the Helm Deployment Guide](https://github.com/osac-project/osac-installer/blob/main/docs/helm-deployment-guide.md#24-aap-license).
-
----
-
 ## Step 5: Refresh the OSAC stack
 
-The snapshot contains a frozen version of OSAC. To apply the latest component images (operator, fulfillment-service, AAP), run the refresh script.
-
-**Why refresh?** The flavor was built at a specific point in time. Your code (or `main`) has likely moved since then. Refresh does a `helm upgrade` with the latest image tags from the osac-installer repo, plus fixes stale routes, certificates, and Keycloak configuration.
-
-### Prerequisites
-
-You need the osac-installer repo cloned, submodules initialized, and up to date:
-
-```bash
-git clone https://github.com/osac-project/osac-installer.git
-cd osac-installer
-git submodule update --init --recursive
-git fetch origin main && git rebase origin/main
-```
-
-The refresh script also requires:
-- **Tools on your laptop:** `python3`, `oc`, `helm`, `curl`, `jq`, and the `osac` CLI
-- **AAP license file** at `values/<env>/license.zip` (e.g., `values/vmaas-ci/license.zip`)
-- **Quay pull secret** at `values/<env>/pull-secret.json` (e.g., `values/vmaas-ci/pull-secret.json`)
-
-See [Obtaining a Pull Secret and AAP License](#obtaining-a-pull-secret-and-aap-license) for how to get these files.
-
-### Verify refresh parameters are current
-
-Before running refresh, check the CI boot script to confirm the env vars below haven't changed:
-
-```bash
-curl -s https://raw.githubusercontent.com/openshift/release/master/ci-operator/step-registry/osac-project/cluster-tool/boot/osac-project-cluster-tool-boot-commands.sh | grep -A5 refresh-after-snapshot
-```
-
-Verify `VALUES_FILE`, `INSTALLER_NAMESPACE`, `INSTALLER_VM_TEMPLATE`, and `INSTALLER_CLUSTER_TEMPLATE` match what's documented below.
-
-### Refresh for VMaaS
-
-```bash
-export KUBECONFIG=~/.kube/<name>.kubeconfig
-cd <path-to-osac-installer>
-
-env \
-    VALUES_FILE=values/vmaas-ci/values.yaml \
-    INSTALLER_NAMESPACE=osac-e2e-ci \
-    INSTALLER_VM_TEMPLATE=osac.templates.ocp_virt_vm \
-    python3 ./scripts/refresh-after-snapshot.py
-```
-
-### Refresh for CaaS
-
-```bash
-export KUBECONFIG=~/.kube/<name>.kubeconfig
-cd <path-to-osac-installer>
-
-env \
-    VALUES_FILE=values/caas-ci/values.yaml \
-    INSTALLER_NAMESPACE=osac-e2e-ci \
-    INSTALLER_CLUSTER_TEMPLATE=osac.templates.ocp_ci_small \
-    python3 ./scripts/refresh-after-snapshot.py
-```
-
-### What refresh does (4 phases, ~10-20 minutes)
-
-| Phase | What |
-|-------|------|
-| 1. Fix identity | Patch stale routes, refresh certificates, configure MetalLB subnet |
-| 2. Prepare | Sync Keycloak realm, create secrets, deploy fulfillment-db |
-| 3. Deploy | `helm upgrade osac` with latest images, wait for rollouts, configure AAP |
-| 4. Post-flight | Create AAP token, create hub, publish templates, create tenants |
-
-### Environment variables reference
-
-| Variable | Required | Default | Purpose |
-|----------|----------|---------|---------|
-| `VALUES_FILE` | Yes | — | Helm values file path (relative to repo root) |
-| `INSTALLER_NAMESPACE` | No | `osac-e2e-ci` | Kubernetes namespace where OSAC is deployed |
-| `INSTALLER_VM_TEMPLATE` | VMaaS | `""` | Template name to wait for after publish |
-| `INSTALLER_CLUSTER_TEMPLATE` | CaaS | `""` | Cluster template name to wait for after publish |
-| `KUBECONFIG` | Yes | — | Path to the cluster's kubeconfig (set in your shell) |
-
-### Testing PR changes with refresh
-
-To test a PR's component image on a snapshot cluster, edit the values file before running refresh:
-
-```bash
-cd osac-installer
-
-# Override the operator image to a PR build
-sed -i 's|ghcr.io/osac-project/osac-operator:sha-.*|ghcr.io/osac-project/osac-operator:sha-YOURSHA|' values/vmaas-ci/values.yaml
-
-# Then run refresh as normal
-```
-
-### CaaS: Additional agent setup
-
-CaaS clusters need an agent VM for hosted cluster provisioning. After refresh:
-
-```bash
-# Get the server's SSH target from cluster-tool config
-SERVER_HOST=$(python3 -c "import json; print(json.load(open('$HOME/.config/cluster-tool/servers.json'))['servers']['<alias>']['host'])")
-
-# Get the libvirt network name for this clone
-LIBVIRT_NETWORK=$(ssh -o StrictHostKeyChecking=no "$SERVER_HOST" \
-    "virsh net-list --name | grep '<name>'" | head -1 | tr -d '[:space:]')
-
-# Create SSH config for the script
-SSH_CONFIG=$(mktemp)
-cat > "$SSH_CONFIG" <<EOF
-Host ci_machine
-    HostName ${SERVER_HOST#*@}
-    User ${SERVER_HOST%%@*}
-    StrictHostKeyChecking no
-    UserKnownHostsFile /dev/null
-    LogLevel ERROR
-EOF
-
-# Run agent setup
-env \
-    LIBVIRT_NETWORK="$LIBVIRT_NETWORK" \
-    SSH_CONFIG="$SSH_CONFIG" \
-    INSTALLER_NAMESPACE=osac-e2e-ci \
-    AGENT_VM_NAME="agent-<name>" \
-    ./scripts/setup-caas-agents.sh
-
-rm -f "$SSH_CONFIG"
-```
-
-This creates an InfraEnv, boots an agent VM, and approves it for hosted cluster provisioning.
+**Read [refresh.md](references/refresh.md)** before running `refresh-after-snapshot.py`. Pull secret and AAP license paths are in [pull-secret-and-license.md](references/pull-secret-and-license.md).
 
 ---
 
@@ -422,50 +275,7 @@ oc get pods -n osac-e2e-ci     # All pods should be Running (after refresh)
 
 ## If You Want to Run E2E Tests
 
-After refresh, you can run the OSAC E2E test suite against your cluster.
-
-### Prerequisites
-
-```bash
-git clone https://github.com/osac-project/osac-test-infra.git
-cd osac-test-infra
-pip install -e .
-```
-
-You also need the `osac` CLI binary. Check the test-infra repo for the current required version.
-
-### VMaaS tests
-
-```bash
-export KUBECONFIG=~/.kube/<name>.kubeconfig
-export OSAC_VM_KUBECONFIG=$KUBECONFIG
-export OSAC_NAMESPACE=osac-e2e-ci
-export OSAC_CLI_PATH=<path-to-osac-binary>
-
-cd osac-test-infra
-make test-vmaas
-```
-
-### CaaS tests
-
-```bash
-export KUBECONFIG=~/.kube/<name>.kubeconfig
-export OSAC_VM_KUBECONFIG=$KUBECONFIG
-export OSAC_NAMESPACE=osac-e2e-ci
-export OSAC_CLI_PATH=<path-to-osac-binary>
-export OSAC_PULL_SECRET_PATH=<path-to-osac-installer>/values/caas-ci/pull-secret.json
-export OSAC_SSH_PUBLIC_KEY_PATH=~/.config/cluster-tool/cluster-tool.key.pub
-export OSAC_CLUSTER_TEMPLATE=osac.templates.ocp_ci_small
-
-cd osac-test-infra
-make test-caas
-```
-
-### Run a specific test
-
-```bash
-make test TEST=test_compute_instance_lifecycle
-```
+**Read [e2e-tests.md](references/e2e-tests.md)** for prerequisites, VMaaS/CaaS commands, and single-test invocation (after refresh).
 
 ---
 
@@ -541,6 +351,8 @@ env \
     INSTALLER_VM_TEMPLATE=osac.templates.ocp_virt_vm \
     python3 ./scripts/refresh-after-snapshot.py
 ```
+
+See [refresh.md](references/refresh.md) for CaaS refresh, PR image overrides, and agent setup.
 
 ### All cluster-tool commands
 

@@ -218,16 +218,22 @@ Canonical skill definitions live in `skills/` (committed OSAC skills plus bootst
 
 `.claude/`, `.cursor/`, and `.gemini/` are gitignored except project settings; bootstrap recreates agent skill symlinks via `tools/link-agent-skills.sh`.
 
+### Skillsaw Linting
+
 **Skillsaw linting** (version pinned in `Makefile` `SKILLSAW_VERSION`; scope is `skillsaw lint .` with blacklist via `.skillsaw.yaml` `exclude:`; strict lint only — no baseline file, see `.gitignore`):
 
 - `make skillsaw` — lint full repo (on-demand; applies `SKILLSAW_VERSION`, `--strict`, `--no-baseline`)
 - `make skillsaw SKILL=skills/<name>/` — lint one skill (same pin and flags; no bare `skillsaw` on PATH)
-- **No pre-commit, no git hooks** — this repo has no root `.pre-commit-config.yaml`; skillsaw never runs automatically on `git commit`/`git push`. CI is the only gate. Keep `Makefile`'s `SKILLSAW_VERSION` and `.github/workflows/skillsaw.yml`'s `version:` input in sync when bumping.
+- Keep `Makefile`'s `SKILLSAW_VERSION` and `.github/workflows/skillsaw.yml`'s `version:` input in sync when bumping.
 - **CI** — `stbenjam/skillsaw` action on PRs (same `.skillsaw.yaml`; fixed command, not `Makefile`); `skillsaw-review` workflow posts inline PR comments from the lint report (no PR code execution in the review job)
 
 Skillsaw enforces [Agent Skills](https://agentskills.io/specification) structure (frontmatter, naming) and content quality heuristics. **Do not rewrite skill semantics just to pass lint** — tune `.skillsaw.yaml` for false positives or fix with backticks (see below).
 
-**Skill authoring conventions** (OSAC skills are workspace operators, not isolated skill bundles):
+### Skill Authoring Conventions
+
+OSAC skills are workspace operators, not isolated skill bundles:
+
+- **Context budget:** Keep `SKILL.md` body under **5,000 tokens** ([Agent Skills spec](https://agentskills.io/specification) Tier 2). Move reference material to `references/` or `steps/` and link from `SKILL.md` with explicit **read before** callouts at each workflow step.
 
 | Reference type | Format | Example |
 |----------------|--------|---------|
@@ -238,6 +244,8 @@ Skillsaw enforces [Agent Skills](https://agentskills.io/specification) structure
 | Bad examples in calibration text | Backtick the quoted phrase | `` `handle edge cases appropriately` `` |
 
 Put `CRITICAL` / `IMPORTANT` rules in the first 20% of `SKILL.md` (skillsaw `content-critical-position`). When stating a prohibition, include the required alternative (for example: do Y instead of X). When lint forces a trade-off between passing and preserving operational guidance, preserve the guidance and adjust config or formatting.
+
+### Available Skills
 
 **OSAC repo-local skills** (in `skills/`):
 

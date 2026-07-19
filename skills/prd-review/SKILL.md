@@ -73,6 +73,8 @@ then assign the score.
 
 Does the PRD clearly describe what users can do or observe?
 
+##### OSAC Dimensions Checklist
+
 Using `.design/context/osac-dimensions.md`, also check whether the PRD
 addresses the OSAC dimensions relevant to this feature:
 - **Services**: Which services (BMaaS, CaaS, VMaaS, MaaS, Enclave) are in scope?
@@ -82,6 +84,8 @@ addresses the OSAC dimensions relevant to this feature:
 - **Documentation**: User-observable doc needs identified; milestone scope (in scope vs deferred); impact on existing documented workflows — detailed doc plan belongs in the EP
 - **UI**: User-observable console needs identified; persona workflows affected; milestone scope (in scope vs API/CLI-only vs deferred) — detailed UI design belongs in the EP
 - **API resources**: For each in-scope service, affected API resources listed
+
+##### Scoring
 
 Not every dimension applies to every feature. Don't penalize for dimensions
 that aren't relevant — but a PRD that names no personas or services has an
@@ -127,8 +131,9 @@ User-facing surfaces (CLI commands, UI pages, API resource names visible to
 users) are WHAT. Internal architecture (controllers, reconcilers, playbooks,
 env vars, finalizers, internal conditions) is HOW.
 
-**OSAC platform vocabulary** — referencing these by name is acceptable context,
-not design leakage:
+##### OSAC Platform Vocabulary
+
+Referencing these by name is acceptable context, not design leakage:
 - Platform: OpenShift, Kubernetes, Hosted Control Planes
 - Services: BMaaS, CaaS, VMaaS, MaaS, Enclave
 - Resources (user-facing): ClusterOrder, ComputeInstance, Tenant, VirtualNetwork, Subnet, SecurityGroup, PublicIPPool, PublicIP, StorageClass
@@ -136,6 +141,8 @@ not design leakage:
 - Storage: VAST, CSI
 - Auth: Keycloak, OPA
 - Tools: kubectl, grpcurl, Helm
+
+##### Scoring
 
 Naming platform technologies is not automatically prescriptive. But mandating
 which internal component solves a problem, or describing controller logic,
@@ -145,7 +152,7 @@ finalizer behavior, or playbook parameters IS design leakage.
 - 1 = Mostly user-focused but some design details leak through — names an internal component or describes a behavior only observable by reading code
 - 2 = Describes only user-observable outcomes; implementation details are absent or limited to platform vocabulary
 
-**Calibration examples:**
+##### Calibration Examples
 
 - UF=0: "When a ClusterOrder reaches phase=Ready and the owning Tenant has StorageBackendReady=True, the storage controller invokes osac-create-tenant-cluster-storage with provisioning_target=hcp_data_plane." — names controllers, internal conditions, playbook parameters.
 - UF=0: "The storage controller places a finalizer on each ClusterOrder where storage was set up. On deletion, it triggers osac-delete-tenant-cluster-storage to remove StorageClasses, VolumeSnapshotClasses, and CSI Secret from the CaaS cluster." — describes finalizer behavior and cleanup implementation.

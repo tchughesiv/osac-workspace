@@ -102,9 +102,9 @@ Execute steps in order. Read the referenced file for each phase:
 
 | Phase | Steps | File |
 |-------|-------|------|
-| Pre-flight | 0a, 0b, 0c, 0d, 0e | `steps/preflight.md` |
-| Tag & publish | 1, 2, 3, 4, 5, 6, 6b | `steps/release.md` |
-| Umbrella & summary | 7, 8, 9 | `steps/umbrella.md` |
+| Pre-flight | 0a, 0b, 0c, 0d, 0e | [`steps/preflight.md`](steps/preflight.md) |
+| Tag & publish | 1, 2, 3, 4, 5, 6, 6b | [`steps/release.md`](steps/release.md) |
+| Umbrella & summary | 7, 8, 9 | [`steps/umbrella.md`](steps/umbrella.md) |
 
 ## Error Handling
 
