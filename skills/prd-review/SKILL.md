@@ -91,13 +91,20 @@ Not every dimension applies to every feature. Don't penalize for dimensions
 that aren't relevant — but a PRD that names no personas or services has an
 unclear WHAT.
 
-- 0 = Vague, unclear, or describes system internals rather than user outcomes. No personas or services identified.
-- 1 = Ambiguous — need is partially clear but mixed with implementation, missing specifics, or missing affected personas
-- 2 = Clear, specific, user-observable capabilities. Affected personas and services identified.
+Each affected persona must have at least one user story grouped under a
+persona heading (e.g., `### Tenant User`). Mentioning a persona in prose
+("Cloud Infrastructure Admins are affected") without a corresponding
+`As a <persona>...` user story does not count — the reviewer cannot
+evaluate what that persona can actually do.
+
+- 0 = Vague, unclear, or describes system internals rather than user outcomes. No personas or services identified, or no per-persona user stories.
+- 1 = Ambiguous — need is partially clear but mixed with implementation, missing specifics, or missing affected personas. Or: user stories exist but some affected personas lack stories.
+- 2 = Clear, specific, user-observable capabilities. Affected personas and services identified. Each affected persona has at least one user story.
 
 **Calibration examples:**
 
 - W=0: "Implement CSI driver installation via AAP playbook on ClusterOrder Ready event" — describes a system action, not a user need. No persona mentioned.
+- W=0: A PRD states "Cloud Infrastructure Admin and Cloud Provider Admin personas are affected" in the problem statement and references personas in functional requirements, but has no User Stories section and no `As a <persona>...` stories. Personas are named but the PRD never describes what each persona can do — the reviewer cannot evaluate completeness.
 - W=1: "Storage should be available on CaaS clusters" — right direction but vague. Which clusters? What does "available" mean to the user? How would a tenant know? No personas identified.
 - W=1: "Tenant users can create and manage secrets" — right direction but generic. What secrets? SSH keypairs? OIDC client secrets? Cluster kubeconfigs? Cloud-init credentials? Without explicit use cases, reviewers can't evaluate whether the scope is right.
 - W=2: "When a CaaS cluster is provisioned and ready, tenants can create persistent volumes using StorageClasses without manual configuration. Tenants can see whether storage is ready on their cluster. Cloud Provider Admins can see storage readiness across all tenant clusters." — clear, observable, specific, personas identified.
