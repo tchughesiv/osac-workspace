@@ -139,10 +139,10 @@ OSAC uses the flightctl ai-workflows PRD and design skills with project-level te
 When publishing PRDs and design documents to the enhancement-proposals repo:
 
 - Skip the "release" question — use `enhancements` as the fixed directory prefix
-- Feature directory: `enhancements/<feature-slug>/` (e.g., `enhancements/storage-network/`)
+- Feature directory: `enhancements/<jira-key>-<feature-slug>/`, where `<jira-key>` is the Jira **Feature**-level key exactly as it appears in Jira (no zero-padding), placed first in the directory name (e.g., `enhancements/OSAC-42-example-feature/`)
 - PRD filename: `prd.md`
 - Design (EP) filename: `design.md`
-- Both files live in the same directory: `enhancements/<slug>/prd.md` and `enhancements/<slug>/design.md`
+- Both files live in the same directory: `enhancements/<jira-key>-<feature-slug>/prd.md` and `enhancements/<jira-key>-<feature-slug>/design.md`
 
 ### Fork-Based Workflow
 
