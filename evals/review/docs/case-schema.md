@@ -4,8 +4,21 @@ Per-case layout for planning-phase review evals. Aligned with
 [agent-eval-harness](https://github.com/opendatahub-io/agent-eval-harness) RFE/review
 conventions (`input.yaml`, `reference-review.md`, `annotations.yaml`).
 
-Every field below is enforced by the `judges:` blocks in `eval-prd-review.yaml`
-and `eval-design-review.yaml` — not aspirational.
+**Judge layout reference:** the `judges:` / `thresholds:` blocks in
+`eval-prd-review.yaml` and `eval-design-review.yaml` follow the structure of
+the harness's own **rfe-creator** eval configuration (inline `check` judges +
+LLM quality judges) — see
+[agent-eval-harness](https://github.com/opendatahub-io/agent-eval-harness)
+judge examples. (Introduced in **OSAC-2264**.)
+
+`expected_verdict`, `expected_scores`, `critical_findings`, `skip_quality`,
+and `reference_review` are enforced by the `judges:` blocks in
+`eval-prd-review.yaml` and `eval-design-review.yaml` — not aspirational.
+`rubric_version` is not read by any judge (the harness's
+`load_case_record()` only exposes `annotations.yaml` to judges), but is
+type/presence-checked by the optional `evals/review/lib/validate_cases.py`.
+The `input.yaml` fields (`skill`, `case_id`, `jira_key`, `pr_number`) are
+documentation-only — neither judges nor `validate_cases.py` check them.
 
 ## Directory layout
 

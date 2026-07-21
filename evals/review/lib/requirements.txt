@@ -1,0 +1,7 @@
+# Deps for running evals/review/lib/*.py tests (test_validate_cases.py,
+# test_judges.py). Floors match the pinned agent-eval-harness's own
+# pyproject.toml constraints (pyyaml, jinja2) plus a reasonable pytest floor —
+# not the harness's own venv, which setup-harness.sh manages separately.
+pytest>=8.0
+pyyaml>=6.0
+jinja2>=3.1
