@@ -28,5 +28,5 @@ jobs:
       - uses: stbenjam/skillsaw@641606f379ebea086b31dec023366c7ff89301a2 # v0
         with:
           path: .
-          version: "0.16.0"
+          version: "0.17.0"
           strict: true

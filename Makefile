@@ -39,7 +39,7 @@ status: ## Show distrobox and image status
 	@echo "=== Distrobox ==="
 	@distrobox list --no-color 2>/dev/null | head -1; distrobox list --no-color 2>/dev/null | awk -F'|' 'NR>1{gsub(/^ +| +$$/,"",$$2); if($$2=="$(DISTROBOX_NAME)") print}' || echo "  (not created)"
 
-SKILLSAW_VERSION ?= 0.16.0
+SKILLSAW_VERSION ?= 0.17.0
 SKILL ?= .
 
 skillsaw: ## Lint repo or one skill (SKILL=skills/<name>/; version pinned here — match skillsaw.yml)

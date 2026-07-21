@@ -4,7 +4,7 @@
 # Lint scope: skillsaw lint . with blacklist excludes below (see Makefile,
 # .github/workflows/skillsaw.yml).
 
-version: "0.16.0"
+version: "0.17.0"
 
 rules:
 
@@ -158,10 +158,16 @@ rules:
     severity: info
 
   # Detect inconsistent terminology across instruction files (e.g., mixing 'directory' and 'folder')
+  # Raised from info (0.16.0 default) now that stbenjam/skillsaw#427 is fixed in 0.17.0:
+  # headings and inline-code path segments no longer count as prose terminology
+  # choices, so the remaining hits are genuine drift, not directory-name or
+  # heading false positives. function/method stays off — Go's Create()/Update()
+  # methods legitimately coexist with "function" used as a verb elsewhere.
   content-inconsistent-terminology:
     enabled: auto
-    severity: info
-    # groups: {}
+    severity: warning
+    groups:
+      function/method: off
 
   # Check if instruction count in a file exceeds LLM instruction budget (~150)
   content-instruction-budget:

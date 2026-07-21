@@ -10,6 +10,7 @@ Meta-workspace that bootstraps all OSAC (Open Sovereign AI Cloud) component repo
 - **Fork-based workflow**: always push to `fork` remote, never to `origin`. PRs go from `fork/<branch>` to `origin/main`
 - **AI attribution**: use `Assisted-by: Claude Code <noreply@anthropic.com>` trailer on commits — never use `Co-Authored-By` for AI tools (Red Hat attribution standard)
 - When debugging Kubernetes operators, check for stale vendor directories and cached images before rebuilding
+- **Don't raise `.skillsaw.yaml`'s `context-budget` skill limit to silence a token-count warning** — split the oversized `SKILL.md` into `references/`/`steps/` instead (see Skill Authoring Conventions)
 
 ## Dev Environment
 
