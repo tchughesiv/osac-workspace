@@ -14,10 +14,10 @@ status-aggregation/secret-handling/branch-restriction items from OSAC-1684
 (`osac-test-infra` PR #182, a credential-scanning workflow, 3 separate review
 cycles across the initial round, a rebase, and a follow-up fix commit - each
 triggering its own fresh CodeRabbit pass), and the log-redaction /
-notify-status lessons from the OSAC-1684 follow-ups (gather scripts echoing
-"redacted" diagnostics back into the job console, and Slack treating
-credential-only findings as FAILED). Apply them proactively - don't wait for
-a reviewer to find them.
+notify-status lessons from follow-up work on credential scanning (gather
+scripts echoing "redacted" diagnostics back into the job console, and Slack
+treating credential-only findings as FAILED). Apply them proactively -
+don't wait for a reviewer to find them.
 
 ## Checklist
 
@@ -128,8 +128,11 @@ Run through this for every new or edited workflow file:
       `status: failure` makes the *e2e* look FAILED even when
       `github.event.workflow_run.conclusion` was `success`, which blocks
       blessing. Keep real failures (scan hard-fail, purge failed, couldn't
-      fetch logs) as `failure`, and use a distinct `warning` (or equivalent)
-      when detection succeeded *and* remediation succeeded. Same spirit as
+      fetch logs) as `failure` in the Slack notification payload, and use a
+      distinct `warning` (or equivalent) in that payload when detection
+      succeeded *and* remediation succeeded - GitHub Actions step
+      conclusions don't have a native `warning` state, so this applies to
+      the notification content, not the step outcome. Same spirit as
       detection-vs-remediation - the notify status is yet another axis.
 - [ ] **Never re-echo diagnostics into the job console.** `grep -C` /
       `cat` / `$GITHUB_STEP_SUMMARY` on gathered artifacts re-exposes
@@ -140,8 +143,12 @@ Run through this for every new or edited workflow file:
 - [ ] **Redact every encoding of a secret.** Base64-encoded payloads
       survive plaintext JSON redaction. Decode each quoted candidate
       (standard + URL-safe) and check for the key; when found, replace the
-      original encoded blob with a redaction marker. Use `[^"]+` for
-      password character classes (not `[A-Za-z0-9+/=]`). See
+      original encoded blob with a redaction marker. Prefer JSON parsing
+      for structured values; if using regex, `[^"]+` is a starting point
+      for double-quoted JSON but misses escaped quotes (`\"`). Avoid
+      overly narrow classes like `[A-Za-z0-9+/=]` that miss punctuation.
+      Adapt the approach for other contexts (single-quoted, URL-embedded,
+      etc.). See
       [reference.md](reference.md#dont-re-echo-redacted-diagnostics).
 - [ ] **A same-file `if:` conditional is not a security boundary against ref
       selection.** For `workflow_dispatch` (or anything else where the

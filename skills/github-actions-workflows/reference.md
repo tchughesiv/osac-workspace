@@ -330,15 +330,14 @@ artifact link when it's actually there.
 
 Redacting files before `actions/upload-artifact` is necessary but not
 sufficient if a later step reprints those files (or a `grep -C` around
-them) into the job console. Found on `osac-test-infra`'s
-`gather-osac-logs.sh` after OSAC-1684's scanner landed: plaintext
-`"break_glass_credentials":{...}` in fulfillment logs was already
-redacted in the artifact, but the same passwords also appeared
-**base64-encoded inside SQL DEBUG parameters**. A new "failure summary"
-that grepped `error|panic|fatal` with `-C3` and `echo`'d the matches
-into the Gather artifacts step log re-introduced those blobs into the
-*workflow run logs* - which is what `scan-e2e-logs.yml` scans - so every
-green e2e still tripped "Credential(s) detected" on Slack.
+them) into the job console. Example: plaintext credential JSON in
+application logs was already redacted in the artifact, but the same
+passwords also appeared **base64-encoded inside SQL DEBUG parameters**.
+A "failure summary" step that grepped `error|panic|fatal` with `-C3`
+and `echo`'d the matches into the job log re-introduced those blobs
+into the *workflow run logs* - which is what a downstream log scanner
+sees - so every green run still tripped "Credential(s) detected"
+on Slack.
 
 Two independent mistakes, both required:
 
@@ -361,7 +360,9 @@ Two independent mistakes, both required:
 
 Related: quoted password/token sed classes that only allow
 `[A-Za-z0-9+/=]` miss real passwords with punctuation (`@`, `%`, `#`) -
-use `[^"]+` (or equivalent) for the value.
+prefer JSON parsing for structured values; if using regex, `[^"]+` is a
+starting point for double-quoted JSON but misses escaped quotes (`\"`).
+Adapt the approach for other contexts (single-quoted, URL-embedded).
 
 Separately, when a post-run scanner *does* find credentials in an
 otherwise-green run, don't post the notify as `status: failure` for the
