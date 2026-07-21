@@ -108,13 +108,14 @@ Bugfix eval model policy remains in external `osac-bugfix-eval`.
 
 | Role | Pinned model | Notes |
 |------|--------------|-------|
-| Skill (`prd-review`, `design-review`) | `claude-sonnet-4-6` | Read-only doc review + structured output |
-| Judge (LLM judges) | `claude-sonnet-4-6` | Same default; inline `check` judges are model-agnostic |
+| Skill (`prd-review`, `design-review`) | `opus-4.6` | Matches team default for review evals (OSAC-2266) |
+| Judge (LLM judges) | `opus-4.6` | Same pin when LLM judges are configured; inline `check` judges are model-agnostic |
 
-**Rationale:** cost-effective golden-set regression on reference cases; distinct from
-harness template Opus defaults for general skill evals.
+**Rationale:** align planning review evals with production review quality expectations
+and OSAC-2266 acceptance criteria. Harness template defaults may differ; this repo pins
+`opus-4.6` in eval YAML for skill and judge roles.
 
-Eval YAML pins `claude-sonnet-4-6` for both roles. The baseline report records
+Eval YAML pins `opus-4.6` for both roles. The baseline report records
 pinned models alongside `rubric_version`.
 
 **Bump policy:** intentional model changes require YAML update and a new baseline run.

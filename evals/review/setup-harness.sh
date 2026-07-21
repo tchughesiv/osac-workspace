@@ -58,7 +58,7 @@ mkdir -p "${REVIEW_DIR}/.harness"
 
 if [[ -d "$HARNESS_DIR/.git" ]]; then
   echo "Updating harness at ${HARNESS_DIR}..." >&2
-  git -C "$HARNESS_DIR" fetch --tags origin
+  git -C "$HARNESS_DIR" fetch --tags --prune origin
 else
   echo "Cloning ${REPO} into ${HARNESS_DIR}..." >&2
   git clone --depth 1 --branch "$REF" "$REPO" "$HARNESS_DIR" 2>/dev/null || {
@@ -69,10 +69,16 @@ else
 fi
 
 if [[ "$FORCE" -eq 1 ]]; then
-  git -C "$HARNESS_DIR" fetch --tags origin
+  git -C "$HARNESS_DIR" fetch --tags --prune origin
 fi
 
-git -C "$HARNESS_DIR" checkout -q "$REF" 2>/dev/null || git -C "$HARNESS_DIR" checkout -q "tags/${REF}"
+if git -C "$HARNESS_DIR" checkout -q "$REF" 2>/dev/null; then
+  :
+elif git -C "$HARNESS_DIR" checkout -q "tags/${REF}" 2>/dev/null; then
+  :
+else
+  die "failed to checkout harness ref ${REF} (try setup-harness.sh --force)"
+fi
 
 if [[ -n "$SHA" ]]; then
   actual_sha="$(git -C "$HARNESS_DIR" rev-parse HEAD)"

@@ -238,11 +238,14 @@ import yaml, sys
 cfg = yaml.safe_load(open(sys.argv[1]))
 print(cfg.get('models', {}).get('judge') or cfg.get('models', {}).get('skill', ''))
 " "$config")"
-    "$PYTHON" "${HARNESS_SCRIPTS}/score.py" judges \
-      --run-id "$RUN_ID" \
-      --config "$config" \
-      --workspace "$workspace_path" \
-      --model "$judge_model"
+    local -a score_args=(
+      "$PYTHON" "${HARNESS_SCRIPTS}/score.py" judges
+      --run-id "$RUN_ID"
+      --config "$config"
+      --workspace "$workspace_path"
+    )
+    [[ -n "$judge_model" ]] && score_args+=(--model "$judge_model")
+    "${score_args[@]}"
   fi
 
   echo "Results: ${OUTPUT_DIR}" >&2
