@@ -82,6 +82,18 @@ def critical_findings_recall(outputs=None, **kwargs):
 
     A finding counts as recalled if >=60% of its substantive (non-stopword)
     tokens appear in the review output.
+
+    Known limitation: bag-of-words overlap has no notion of polarity, so a
+    review that asserts the *opposite* of a critical finding (e.g. "tenant
+    isolation is thoroughly addressed" vs. a finding of "missing tenant
+    isolation") can still score above threshold on shared topic words alone
+    — see the case-schema.md "Known limitations" note for detail and the
+    alternatives considered (AC-2 requires this stay a deterministic check/
+    code judge, ruling out an LLM-based fix here). The optional
+    qualitative_finding_quality LLM judge is the intended backstop: it
+    compares substantive content against reference-review.md and would
+    catch a review that gets the substance backwards, whenever
+    skip_quality isn't set.
     """
     outputs = outputs or {}
     annotations = outputs.get("annotations", {})

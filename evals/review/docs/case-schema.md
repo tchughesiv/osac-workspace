@@ -80,6 +80,29 @@ Expected outcomes for harness judges:
 | `skip_quality` | No | When true, skip the optional `qualitative_finding_quality` LLM judge |
 | `reference_review` | Effectively yes (for `qualitative_finding_quality`) | Filename of the human-validated review, relative to the case directory — typically `reference-review.md`. The harness's `load_case_record()` only resolves `outputs.annotation_{field}_content` for keys that are *literally present* in `annotations.yaml`; it does not fall back to `reference-review.md` by convention if the key is absent. Every case must set this key explicitly, even when the file is already named `reference-review.md`, or `outputs.annotation_reference_review_content` in the `qualitative_finding_quality` judge's prompt template renders empty and the judge scores against a blank reference with no error |
 
+### Known limitations
+
+`critical_findings_recall`'s bag-of-words token overlap has no notion of
+polarity: a review that asserts the *opposite* of a critical finding (e.g.
+"tenant isolation is thoroughly addressed" vs. a finding of "missing
+tenant isolation") can still score above the 60% threshold purely on
+shared topic words. AC-2 requires this judge stay a deterministic
+`check`/code judge (no LLM), which rules out a semantic-matching fix here;
+a schema change requiring canonical finding IDs from the review skill's
+own output would be a heavier, cross-component fix belonging to a
+different story. The `qualitative_finding_quality` LLM judge is the
+intended backstop for this specific failure mode — it compares
+substantive content against `reference-review.md` and would score a
+review that gets the substance backwards — but only runs when
+`skip_quality` isn't set. A cheaper deterministic partial mitigation (a
+small negation-cue word list, e.g. "missing"/"lacks"/"no"/"not" — flag as
+suspicious when the finding contains one and the review contains none)
+was evaluated but deferred: it only covers explicit negation phrasing, not
+polarity flips phrased other ways, and needs real observed cases to
+justify the added complexity. Revisit once `OSAC-2265`'s curated golden
+cases and `OSAC-2267`'s baseline report show whether this is an actual
+observed failure mode.
+
 Example (PRD — keys from `skills/prd-review/SKILL.md` rubric table):
 
 ```yaml
