@@ -215,6 +215,23 @@ def test_invalid_expected_verdict_value(tmp_path: Path, workspace_root: Path):
     assert any("expected_verdict" in e for e in errors)
 
 
+def test_unhashable_expected_verdict_reports_error_without_raising(tmp_path: Path,
+                                                                     workspace_root: Path):
+    """A list/dict-valued expected_verdict must be reported as an error, not
+    raise TypeError from `verdict not in _VALID_VERDICTS` (a set membership
+    check implicitly hashes its operand).
+    """
+    case_dir = tmp_path / "cases" / "example"
+    _write_case(case_dir, input_yaml=VALID_INPUT, annotations_yaml=(
+        "expected_verdict: [PASS]\nrubric_version: \"2026-07\"\nexpected_scores: {}\n"
+    ))
+
+    valid, errors = validate_case(case_dir, workspace_root)
+
+    assert valid is False
+    assert any("expected_verdict" in e for e in errors)
+
+
 def test_missing_expected_scores_field(tmp_path: Path, workspace_root: Path):
     case_dir = tmp_path / "cases" / "example"
     _write_case(case_dir, input_yaml=VALID_INPUT, annotations_yaml=(

@@ -26,7 +26,11 @@ _STOPWORDS = {
 
 
 def _tokens(s):
-    return {t for t in re.findall(r"[a-z0-9]+", s.lower()) if t not in _STOPWORDS}
+    # \w is Unicode-aware by default for str patterns in Python 3 (matches
+    # letters/digits in any script, not just ASCII a-z0-9), so accented and
+    # non-Latin findings still produce tokens instead of silently reducing
+    # to an empty set and being skipped by the `if not cf_tokens` guard below.
+    return {t for t in re.findall(r"\w+", s.lower()) if t not in _STOPWORDS}
 
 
 def rubric_scoring(outputs=None, **kwargs):

@@ -91,7 +91,7 @@ def _validate_document_path(input_data: dict, case_dir: Path,
 
 def _validate_annotations(annotations_data: dict, case_dir: Path, errors: list[str]) -> None:
     verdict = annotations_data.get("expected_verdict")
-    if verdict not in _VALID_VERDICTS:
+    if not isinstance(verdict, str) or verdict not in _VALID_VERDICTS:
         errors.append(
             f"annotations.yaml: expected_verdict must be one of "
             f"{sorted(_VALID_VERDICTS)}, got {verdict!r}"

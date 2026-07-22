@@ -127,3 +127,18 @@ class TestCriticalFindingsRecall:
         passed, rationale = critical_findings_recall(outputs=outputs)
 
         assert passed is True, rationale
+
+    def test_accented_finding_recalled(self):
+        """Non-ASCII tokens (accented Latin here) must not silently reduce
+        to zero tokens and get skipped — \\w+ is Unicode-aware, unlike the
+        original [a-z0-9]+ tokenizer.
+        """
+        outputs = _outputs(
+            findings="The migration plan omits a rollback strategy for the "
+                     "café deployment scenario.",
+            annotations={"critical_findings": ["Missing rollback for café deployment"]},
+        )
+
+        passed, rationale = critical_findings_recall(outputs=outputs)
+
+        assert passed is True, rationale
