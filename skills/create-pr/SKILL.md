@@ -1,6 +1,6 @@
 ---
 name: create-pr
-description: Create a pull request on an OSAC component repo using the fork-based workflow. Runs repo-specific validation (build, test, lint), pushes to the developer's fork remote, and opens a PR against origin/main with proper title format. Use when the user says 'create PR', 'open PR', 'submit for review', 'push and create PR', or when finishing a feature branch.
+description: Create a PR on an OSAC component repo using the fork-based workflow. Runs repo-specific validation (build, test, lint), pushes to the developer's fork remote, and opens a PR against origin/main with proper title format. Use when the user says 'create PR', 'open PR', 'submit for review', 'push and create PR', or when finishing a feature branch.
 ---
 
 # Create Pull Request
