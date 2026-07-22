@@ -71,6 +71,12 @@ then assign the score.
 
 #### 1. WHAT — Clear user-facing need? (0-2)
 
+Does the PRD describe a new or changed product capability — something that
+requires building, not just writing content? A PRD whose sole deliverable is
+documentation, example files, configuration samples, or other content with no
+new platform capability is not an enhancement — it belongs in a Jira task, not
+the PRD pipeline. Score 0 if there is no new product capability.
+
 Does the PRD clearly describe what users can do or observe?
 
 ##### OSAC Dimensions Checklist
@@ -103,6 +109,7 @@ evaluate what that persona can actually do.
 
 **Calibration examples:**
 
+- W=0: "Ship example YAML files and a README in the repo so admins can load them with `osac create -f`." — the API and CLI already exist; the deliverable is content (example files + docs), not a product capability. This is a Jira task, not an enhancement.
 - W=0: "Implement CSI driver installation via AAP playbook on ClusterOrder Ready event" — describes a system action, not a user need. No persona mentioned.
 - W=0: A PRD states "Cloud Infrastructure Admin and Cloud Provider Admin personas are affected" in the problem statement and references personas in functional requirements, but has no User Stories section and no `As a <persona>...` stories. Personas are named but the PRD never describes what each persona can do — the reviewer cannot evaluate completeness.
 - W=1: "Storage should be available on CaaS clusters" — right direction but vague. Which clusters? What does "available" mean to the user? How would a tenant know? No personas identified.
@@ -217,7 +224,10 @@ Can the requirements be verified by a PM or QA engineer using the product?
 
 A single zero is an automatic fail because it signals a fundamental problem
 (e.g., the PRD is a design doc, or requirements are untestable). The author
-must fix zero-scored criteria before resubmission.
+must fix zero-scored criteria before resubmission. Exception: if WHAT
+scores zero because the work is content-only (docs, examples, config
+samples), the recommendation is to track it as a Jira task, not resubmit
+as a PRD.
 
 ## Output Format
 
