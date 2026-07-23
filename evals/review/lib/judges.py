@@ -12,6 +12,7 @@ tuple return.
 """
 
 import re
+import unicodedata
 
 _ARTIFACT_KEY = "artifacts/review-output.md"
 
@@ -26,10 +27,16 @@ _STOPWORDS = {
 
 
 def _tokens(s):
-    # \w is Unicode-aware by default for str patterns in Python 3 (matches
-    # letters/digits in any script, not just ASCII a-z0-9), so accented and
-    # non-Latin findings still produce tokens instead of silently reducing
-    # to an empty set and being skipped by the `if not cf_tokens` guard below.
+    # NFC-normalize first so canonically-equivalent Unicode forms tokenize
+    # identically — e.g. precomposed "café" (U+00E9) and decomposed
+    # "cafe\u0301" (e + combining acute accent) both become the former,
+    # instead of comparing unequal despite being the same text.
+    # \w is then Unicode-aware by default for str patterns in Python 3
+    # (matches letters/digits in any script, not just ASCII a-z0-9), so
+    # accented and non-Latin findings still produce tokens instead of
+    # silently reducing to an empty set and being skipped by the
+    # `if not cf_tokens` guard below.
+    s = unicodedata.normalize("NFC", s)
     return {t for t in re.findall(r"\w+", s.lower()) if t not in _STOPWORDS}
 
 
@@ -38,6 +45,11 @@ def rubric_scoring(outputs=None, **kwargs):
 
     No ±1 tolerance: every dimension in `expected_scores` must match the
     review output's rubric table exactly, and the verdict must match too.
+
+    `expected_scores: {}` (explicit empty mapping) skips scoring — the
+    documented marker for a wiring-only smoke fixture. A missing
+    `expected_scores` key entirely is treated as an incomplete/malformed
+    case and fails instead of skipping.
     """
     outputs = outputs or {}
     annotations = outputs.get("annotations", {})
@@ -58,8 +70,20 @@ def rubric_scoring(outputs=None, **kwargs):
     }
 
     expected_verdict = annotations.get("expected_verdict")
-    expected_scores = annotations.get("expected_scores") or {}
 
+    # An explicit empty mapping (expected_scores: {}) is the documented way
+    # to mark a wiring-only smoke fixture with no real rubric baseline yet —
+    # skip in that case. A missing key entirely is different: it means the
+    # case's annotations.yaml is incomplete (or malformed) rather than
+    # intentionally smoke-only, so it must fail loudly instead of silently
+    # passing — otherwise a broken case could pass CI with no rubric check
+    # ever having run against it.
+    if "expected_scores" not in annotations:
+        return (False, "annotations.yaml missing expected_scores (required — "
+                        "use an explicit empty mapping {} to mark a "
+                        "wiring-only smoke fixture instead of omitting the key)")
+
+    expected_scores = annotations["expected_scores"] or {}
     if not expected_scores:
         return (True, "No expected_scores in annotations.yaml (smoke fixture) - skipped")
 

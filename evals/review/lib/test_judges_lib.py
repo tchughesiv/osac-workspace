@@ -81,6 +81,20 @@ class TestRubricScoring:
 
         assert passed is True, rationale
 
+    def test_missing_expected_scores_key_fails(self):
+        """A missing `expected_scores` key (case's annotations.yaml is
+        incomplete/malformed) must fail loudly, unlike an explicit empty
+        mapping (the documented smoke-fixture marker, tested above) which
+        skips. Otherwise a broken case could silently pass rubric_scoring
+        with no rubric check ever having run.
+        """
+        outputs = _outputs(annotations={"expected_verdict": "PASS"})
+
+        passed, rationale = rubric_scoring(outputs=outputs)
+
+        assert passed is False
+        assert "expected_scores" in rationale
+
 
 class TestCriticalFindingsRecall:
     def test_paraphrased_finding_recalled(self):
@@ -137,6 +151,25 @@ class TestCriticalFindingsRecall:
             findings="The migration plan omits a rollback strategy for the "
                      "café deployment scenario.",
             annotations={"critical_findings": ["Missing rollback for café deployment"]},
+        )
+
+        passed, rationale = critical_findings_recall(outputs=outputs)
+
+        assert passed is True, rationale
+
+    def test_decomposed_and_precomposed_accents_tokenize_the_same(self):
+        """Canonically-equivalent Unicode forms must tokenize identically —
+        precomposed "café" (U+00E9) in the finding vs. decomposed
+        "cafe\\u0301" (e + combining acute accent, U+0065 U+0301) in the
+        review output, or vice versa, must still overlap. NFC-normalizing
+        in `_tokens()` before tokenizing is what makes this hold; without
+        it the two forms produce different token strings despite being the
+        same text.
+        """
+        outputs = _outputs(
+            findings="The migration plan omits a rollback strategy for the "
+                     "cafe\u0301 deployment scenario.",  # decomposed
+            annotations={"critical_findings": ["Missing rollback for café deployment"]},  # precomposed
         )
 
         passed, rationale = critical_findings_recall(outputs=outputs)

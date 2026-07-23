@@ -143,6 +143,15 @@ class TestRubricScoring:
 
         assert passed is True, rationale
 
+    def test_missing_expected_scores_key_fails(self, config_path):
+        review_output = _build_review_output({"WHAT (clear need)": 2}, "PASS")
+        annotations = {"expected_verdict": "PASS"}
+
+        passed, rationale = _run_judge(config_path, "rubric_scoring", annotations, review_output)
+
+        assert passed is False
+        assert "expected_scores" in rationale
+
 
 @pytest.mark.parametrize("config_path", _CONFIGS)
 class TestCriticalFindingsRecall:
