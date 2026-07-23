@@ -67,6 +67,7 @@ if [ -z "${EPIC_KEY:-}" ]; then
   jira issue create -t Epic --project OSAC \
     -s "${EPIC_SUMMARY}" \
     -b "Documentation work gates for ${KEY}. These tasks track drafting, submitting, and merging planning documents — not implementation." \
+    --component "${COMPONENT}" \
     --label bootstrap --no-input --raw >"$OUT" 2>"$ERR" </dev/null
 
   EPIC_KEY=$(jq -r '.key // empty' "$OUT")
