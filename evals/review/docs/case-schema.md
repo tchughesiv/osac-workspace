@@ -9,7 +9,7 @@ conventions (`input.yaml`, `reference-review.md`, `annotations.yaml`).
 the harness's own **rfe-creator** eval configuration (code/LLM quality
 judges) — see
 [agent-eval-harness](https://github.com/opendatahub-io/agent-eval-harness)
-judge examples. (Introduced in **OSAC-2264**.) `rubric_scoring` and
+judge examples. `rubric_scoring` and
 `critical_findings_recall` are `module`/`function` judges backed by
 `evals/review/lib/judges.py` (shared between both eval configs, not
 duplicated inline per file); `qualitative_finding_quality` is an LLM
@@ -79,6 +79,24 @@ Expected outcomes for harness judges:
 | `critical_findings` | No | Strings fuzzy-matched (≥60% token overlap) against agent findings by the `critical_findings_recall` judge |
 | `skip_quality` | No | When true, skip the optional `qualitative_finding_quality` LLM judge |
 | `reference_review` | Effectively yes (for `qualitative_finding_quality`) | Filename of the human-validated review, relative to the case directory — typically `reference-review.md`. The harness's `load_case_record()` only resolves `outputs.annotation_{field}_content` for keys that are *literally present* in `annotations.yaml`; it does not fall back to `reference-review.md` by convention if the key is absent. Every case must set this key explicitly, even when the file is already named `reference-review.md`, or `outputs.annotation_reference_review_content` in the `qualitative_finding_quality` judge's prompt template renders empty and the judge scores against a blank reference with no error |
+
+### Validating a case directory before adding it
+
+`evals/review/lib/validate_cases.py` checks a case directory's structure and
+annotation schema (file presence, `document_path` resolution,
+`expected_verdict`/`rubric_version`/`expected_scores`/`critical_findings`/
+`skip_quality`/`reference_review` types) without running any judge or making
+an LLM call. It is not wired into `run-eval.sh` or CI — run it manually
+against a new case before committing:
+
+```bash
+python3 -c "
+from pathlib import Path
+from evals.review.lib.validate_cases import validate_case
+ok, errors = validate_case(Path('evals/review/cases/prd/<case-id>'), Path('.'))
+print('OK' if ok else '\n'.join(errors))
+"
+```
 
 ### Known limitations
 

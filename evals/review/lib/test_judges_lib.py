@@ -95,6 +95,37 @@ class TestRubricScoring:
         assert passed is False
         assert "expected_scores" in rationale
 
+    def test_null_expected_scores_fails_instead_of_skipping(self):
+        """`expected_scores: null` must fail, not silently skip like the
+        documented `{}` marker — otherwise it would disagree with
+        validate_cases.py, which already rejects None via its
+        `isinstance(expected_scores, dict)` check.
+        """
+        outputs = _outputs(annotations={"expected_verdict": "PASS", "expected_scores": None})
+
+        passed, rationale = rubric_scoring(outputs=outputs)
+
+        assert passed is False
+        assert "mapping" in rationale.lower()
+
+    def test_non_mapping_expected_scores_fails_gracefully(self):
+        """A malformed `expected_scores` (e.g. a YAML list instead of a
+        mapping) must be reported as a validation failure, not crash with
+        an AttributeError — a crash is silently excluded from the harness's
+        pass_rate denominator (score.py drops any case whose judge raised),
+        which would let a malformed case escape AC-2's strict enforcement
+        entirely instead of failing loudly.
+        """
+        outputs = _outputs(annotations={
+            "expected_verdict": "PASS",
+            "expected_scores": ["not", "a", "mapping"],
+        })
+
+        passed, rationale = rubric_scoring(outputs=outputs)
+
+        assert passed is False
+        assert "mapping" in rationale.lower()
+
 
 class TestCriticalFindingsRecall:
     def test_paraphrased_finding_recalled(self):
@@ -175,3 +206,30 @@ class TestCriticalFindingsRecall:
         passed, rationale = critical_findings_recall(outputs=outputs)
 
         assert passed is True, rationale
+
+    def test_bare_string_critical_findings_fails_gracefully(self):
+        """A bare string (e.g. a case author forgetting the YAML list
+        brackets) is truthy, so it passes the eval YAML's `if:` gate — but
+        Python iterates a string character-by-character, which would
+        otherwise silently produce a nonsensical per-character rationale
+        instead of a clear "wrong type" error.
+        """
+        outputs = _outputs(annotations={"critical_findings": "Missing tenant isolation"})
+
+        passed, rationale = critical_findings_recall(outputs=outputs)
+
+        assert passed is False
+        assert "list of strings" in rationale
+
+    def test_non_iterable_critical_findings_fails_gracefully(self):
+        """A non-iterable `critical_findings` (e.g. an int) must be reported
+        as a validation failure, not crash with a TypeError — a crash is
+        silently excluded from the harness's pass_rate denominator, letting
+        a malformed case escape enforcement entirely instead of failing.
+        """
+        outputs = _outputs(annotations={"critical_findings": 5})
+
+        passed, rationale = critical_findings_recall(outputs=outputs)
+
+        assert passed is False
+        assert "list of strings" in rationale

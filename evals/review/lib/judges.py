@@ -49,7 +49,9 @@ def rubric_scoring(outputs=None, **kwargs):
     `expected_scores: {}` (explicit empty mapping) skips scoring — the
     documented marker for a wiring-only smoke fixture. A missing
     `expected_scores` key entirely is treated as an incomplete/malformed
-    case and fails instead of skipping.
+    case and fails instead of skipping. A present-but-non-mapping
+    `expected_scores` (including an explicit `null`) also fails, matching
+    `validate_cases.py`'s type check.
     """
     outputs = outputs or {}
     annotations = outputs.get("annotations", {})
@@ -73,17 +75,23 @@ def rubric_scoring(outputs=None, **kwargs):
 
     # An explicit empty mapping (expected_scores: {}) is the documented way
     # to mark a wiring-only smoke fixture with no real rubric baseline yet —
-    # skip in that case. A missing key entirely is different: it means the
-    # case's annotations.yaml is incomplete (or malformed) rather than
-    # intentionally smoke-only, so it must fail loudly instead of silently
-    # passing — otherwise a broken case could pass CI with no rubric check
-    # ever having run against it.
+    # skip in that case. A missing key, a null value, or any non-mapping
+    # value is different: it means the case's annotations.yaml is
+    # incomplete or malformed rather than intentionally smoke-only, so it
+    # must fail loudly instead of silently passing — otherwise a broken
+    # case could pass CI with no rubric check ever having run against it.
+    # (Matches validate_cases.py's `isinstance(expected_scores, dict)`
+    # check, so the two modules agree on every input shape, not just the
+    # documented ones.)
     if "expected_scores" not in annotations:
         return (False, "annotations.yaml missing expected_scores (required — "
                         "use an explicit empty mapping {} to mark a "
                         "wiring-only smoke fixture instead of omitting the key)")
 
-    expected_scores = annotations["expected_scores"] or {}
+    expected_scores = annotations["expected_scores"]
+    if not isinstance(expected_scores, dict):
+        return (False, f"annotations.yaml expected_scores must be a mapping, "
+                        f"got {type(expected_scores).__name__}")
     if not expected_scores:
         return (True, "No expected_scores in annotations.yaml (smoke fixture) - skipped")
 
@@ -105,7 +113,8 @@ def critical_findings_recall(outputs=None, **kwargs):
     """Stopword-filtered token-overlap match of annotations.yaml critical findings.
 
     A finding counts as recalled if >=60% of its substantive (non-stopword)
-    tokens appear in the review output.
+    tokens appear in the review output. `critical_findings` must be a list
+    of strings; any other type fails rather than iterating unpredictably.
 
     Known limitation: bag-of-words overlap has no notion of polarity, so a
     review that asserts the *opposite* of a critical finding (e.g. "tenant
@@ -121,10 +130,22 @@ def critical_findings_recall(outputs=None, **kwargs):
     """
     outputs = outputs or {}
     annotations = outputs.get("annotations", {})
+
+    critical_findings = annotations.get("critical_findings", [])
+    is_list_of_str = (isinstance(critical_findings, list)
+                       and all(isinstance(cf, str) for cf in critical_findings))
+    if not is_list_of_str:
+        # Guards against e.g. a bare string (iterates character-by-character
+        # instead of raising — silently wrong rather than loudly broken) or
+        # a non-iterable value (raises TypeError). Matches
+        # validate_cases.py's equivalent check, so both modules agree.
+        return (False, f"annotations.yaml critical_findings must be a list "
+                        f"of strings, got {critical_findings!r}")
+
     content = outputs.get("files", {}).get(_ARTIFACT_KEY, "")
     content_tokens = _tokens(content)
     missing = []
-    for cf in annotations.get("critical_findings", []):
+    for cf in critical_findings:
         cf_tokens = _tokens(cf)
         if not cf_tokens:
             continue

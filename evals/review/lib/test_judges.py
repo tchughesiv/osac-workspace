@@ -152,6 +152,29 @@ class TestRubricScoring:
         assert passed is False
         assert "expected_scores" in rationale
 
+    def test_null_expected_scores_fails_instead_of_skipping(self, config_path):
+        review_output = _build_review_output({"WHAT (clear need)": 2}, "PASS")
+        annotations = {"expected_verdict": "PASS", "expected_scores": None}
+
+        passed, rationale = _run_judge(config_path, "rubric_scoring", annotations, review_output)
+
+        assert passed is False
+        assert "mapping" in rationale.lower()
+
+    def test_non_mapping_expected_scores_fails_gracefully(self, config_path):
+        """Loaded through the harness's real EvalConfig/load_judges path —
+        confirms a malformed expected_scores value is reported as a
+        (False, ...) result rather than propagating as an unhandled
+        exception through the real judge-loading code.
+        """
+        review_output = _build_review_output({"WHAT (clear need)": 2}, "PASS")
+        annotations = {"expected_verdict": "PASS", "expected_scores": ["not", "a", "mapping"]}
+
+        passed, rationale = _run_judge(config_path, "rubric_scoring", annotations, review_output)
+
+        assert passed is False
+        assert "mapping" in rationale.lower()
+
 
 @pytest.mark.parametrize("config_path", _CONFIGS)
 class TestCriticalFindingsRecall:
@@ -202,3 +225,31 @@ class TestCriticalFindingsRecall:
             config_path, "critical_findings_recall", annotations, review_output)
 
         assert passed is False, rationale
+
+    def test_bare_string_critical_findings_fails_gracefully(self, config_path):
+        """A bare string (truthy, so it passes the `if:` condition) must be
+        rejected with a clear type error, not silently iterated
+        character-by-character.
+        """
+        review_output = _build_review_output({"WHAT (clear need)": 2}, "PASS")
+        annotations = {"critical_findings": "Missing tenant isolation"}
+
+        passed, rationale = _run_judge(
+            config_path, "critical_findings_recall", annotations, review_output)
+
+        assert passed is False
+        assert "list of strings" in rationale
+
+    def test_non_iterable_critical_findings_fails_gracefully(self, config_path):
+        """A non-iterable value (truthy, so it passes the `if:` condition)
+        must be reported as a (False, ...) result through the real
+        judge-loading path, not propagate as an unhandled TypeError.
+        """
+        review_output = _build_review_output({"WHAT (clear need)": 2}, "PASS")
+        annotations = {"critical_findings": 5}
+
+        passed, rationale = _run_judge(
+            config_path, "critical_findings_recall", annotations, review_output)
+
+        assert passed is False
+        assert "list of strings" in rationale
