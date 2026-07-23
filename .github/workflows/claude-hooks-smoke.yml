@@ -1,0 +1,26 @@
+name: Claude Hooks Smoke Test
+
+# No paths-ignore: this job (checkout + smoke test) takes only a few seconds,
+# so filtering triggers isn't worth the risk of a path list drifting out of
+# sync and silently skipping the test on a relevant change (e.g. to
+# .claude/settings.json, which the smoke test reads directly).
+on:
+  pull_request: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: claude-hooks-smoke-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  claude-hooks-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Run claude-hooks smoke test
+        run: bash tools/test/claude-hooks-smoke.sh
