@@ -144,6 +144,11 @@ These apply across all sections:
 - **This section is optional.** If there's nothing beyond the obvious,
   omit the section body entirely — do not write "N/A" or invent
   non-goals to fill the section.
+- When excluding something because an adjacent Enhancement Proposal
+  already covers it through a different mechanism (see
+  `.design/context/adjacent-eps.md`), name that EP by its Jira/EP
+  identifier and say what it covers instead — do not just say the item
+  is "out of scope" with no pointer to where it actually lives.
 
 ## User Stories
 
