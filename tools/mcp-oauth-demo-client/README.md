@@ -17,6 +17,10 @@ registered in `osac-installer`'s bootstrap realm (`charts/osac-infra/files/realm
 This is a standalone Go module with no dependency on any `fulfillment-service` internal package — it
 only speaks the MCP wire protocol — which is why it lives here rather than inside that module.
 
+See [`RUNBOOK.md`](RUNBOOK.md) for a full end-to-end walkthrough (booting a cluster, seeding a
+catalog item, running `mcp-server`, then this client) if you don't already have all of the
+prerequisites below in place.
+
 ## Prerequisites
 
 - `fulfillment-service`'s `start mcp-server` running with OAuth discovery configured
