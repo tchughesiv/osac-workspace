@@ -35,5 +35,10 @@ go run . -server-url http://localhost:8001
 Run `go run . -h` for the full flag list (callback port, client ID, issuer pinning, which catalog item
 to use, field overrides via repeated `-set key=value`, status-poll count/interval).
 
+Against a dev cluster whose Keycloak/`mcp-server` TLS certs are signed by a cluster-local CA (e.g. a
+kind cluster via `osac-installer`), pass `-ca-file` pointing at that CA's PEM bundle (see
+`osac-installer`'s `ca-bundle` ConfigMap in the OSAC instance namespace) — otherwise both the OAuth
+discovery requests and the MCP connection itself fail TLS verification.
+
 The demo does not delete the cluster it creates — clean it up afterward via the `osac` CLI or console
 if this was just a demo run.

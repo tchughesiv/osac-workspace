@@ -17,6 +17,8 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -24,6 +26,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"os"
 	"os/exec"
 	"runtime"
 	"strings"
@@ -53,6 +56,12 @@ var (
 		"Optional: pin the expected Keycloak realm issuer URL. If set, authorization fails if the "+
 			"server-advertised issuer doesn't match — recommended once you know the real issuer, to guard "+
 			"against a misconfigured or spoofed Authorization Server.",
+	)
+	caFile = flag.String(
+		"ca-file", "",
+		"Optional: path to a PEM file of additional CA certificates to trust, appended to the system pool. Needed "+
+			"against a dev cluster (e.g. kind) whose Keycloak/mcp-server TLS certs are signed by a cluster-local "+
+			"CA the host OS doesn't already trust — see osac-installer's ca-bundle ConfigMap.",
 	)
 	catalogItem = flag.String(
 		"catalog-item", "",
@@ -251,8 +260,35 @@ func resultText(result *mcp.CallToolResult) string {
 	return b.String()
 }
 
+// newHTTPClient builds the *http.Client used for every request this program makes to the Authorization Server and
+// mcp-server: protected-resource/authorization-server metadata discovery, the token exchange, and the MCP wire
+// protocol itself. Returns nil (letting SDK callers fall back to their own default) when -ca-file is unset, so the
+// common case — a real CA already trusted by the host OS — needs no extra plumbing.
+func newHTTPClient() *http.Client {
+	if *caFile == "" {
+		return nil
+	}
+	pem, err := os.ReadFile(*caFile)
+	if err != nil {
+		log.Fatalf("failed to read -ca-file %q: %v", *caFile, err)
+	}
+	pool, err := x509.SystemCertPool()
+	if err != nil || pool == nil {
+		pool = x509.NewCertPool()
+	}
+	if !pool.AppendCertsFromPEM(pem) {
+		log.Fatalf("no certificates found in -ca-file %q", *caFile)
+	}
+	return &http.Client{
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{RootCAs: pool}, //nolint:gosec // pool always includes the system roots too
+		},
+	}
+}
+
 func main() {
 	flag.Parse()
+	httpClient := newHTTPClient()
 
 	receiver := &codeReceiver{
 		// Buffered by 1: getAuthorizationCode only ever receives once, but a browser reload of the static
@@ -275,6 +311,7 @@ func main() {
 			ClientID: *clientID,
 			Issuer:   *issuer,
 		},
+		Client: httpClient,
 	})
 	if err != nil {
 		log.Fatalf("failed to create the OAuth handler: %v", err)
@@ -284,6 +321,7 @@ func main() {
 	transport := &mcp.StreamableClientTransport{
 		Endpoint:     *serverURL,
 		OAuthHandler: authHandler,
+		HTTPClient:   httpClient,
 	}
 
 	ctx := context.Background()
